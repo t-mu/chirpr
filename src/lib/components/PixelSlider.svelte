@@ -6,10 +6,11 @@
 		step: number;
 		value: number;
 		unit?: string;
+		disabled?: boolean;
 		onChange?: (value: number) => void;
 	}
 
-	let { label, min, max, step, value, unit = '', onChange }: Props = $props();
+	let { label, min, max, step, value, unit = '', disabled = false, onChange }: Props = $props();
 	let flash = $state(false);
 	let flashTimeout: number | undefined;
 
@@ -30,6 +31,7 @@
 	}
 
 	function handleInput(event: Event): void {
+		if (disabled) return;
 		const target = event.currentTarget as HTMLInputElement;
 		const nextValue = Number(target.value);
 		triggerFlash();
@@ -39,7 +41,7 @@
 
 <label class="pixel-slider">
 	<span class="pixel-slider__label">{label}</span>
-	<input type="range" {min} {max} {step} {value} oninput={handleInput} />
+	<input type="range" {min} {max} {step} {value} {disabled} oninput={handleInput} />
 	<span class="pixel-slider__value" class:flash>{value}{unit}</span>
 </label>
 

@@ -10,6 +10,7 @@
 	import PresetPanel from '$lib/components/PresetPanel.svelte';
 	import RandomizerPanel from '$lib/components/RandomizerPanel.svelte';
 	import ExportPanel from '$lib/components/ExportPanel.svelte';
+	import { createDashboardKeydownHandler } from '$lib/components/dashboardShortcuts';
 	import { params, resetParams, setParams, updateParam } from '$lib/stores/synthParams.svelte';
 	import {
 		DEFAULT_PARAMS,
@@ -120,44 +121,13 @@
 		synthesizer?.updateParams(DEFAULT_PARAMS);
 	}
 
-	function isEditableTarget(target: EventTarget | null): boolean {
-		if (!(target instanceof HTMLElement)) return false;
-		return (
-			target instanceof HTMLInputElement ||
-			target instanceof HTMLTextAreaElement ||
-			target.isContentEditable
-		);
-	}
-
-	function onKeydown(event: KeyboardEvent): void {
-		if (isEditableTarget(event.target)) return;
-
-		const key = event.key.toLowerCase();
-		const isSpace = event.code === 'Space' || event.key === ' ';
-
-		if (isSpace) {
-			event.preventDefault();
-			void togglePlay();
-			return;
-		}
-
-		if (event.code === 'KeyR' || key === 'r') {
-			event.preventDefault();
-			void applyRandomCategory(lastRandomCategory);
-			return;
-		}
-
-		if (event.code === 'KeyS' || key === 's') {
-			event.preventDefault();
-			focusPresetInput();
-			return;
-		}
-
-		if (event.code === 'Escape' || key === 'escape') {
-			event.preventDefault();
-			resetAllParams();
-		}
-	}
+	const onKeydown = createDashboardKeydownHandler({
+		togglePlay: () => void togglePlay(),
+		applyRandomCategory: (category) => void applyRandomCategory(category),
+		getLastRandomCategory: () => lastRandomCategory,
+		focusPresetInput,
+		resetAllParams
+	});
 
 	onMount(() => {
 		window.addEventListener('keydown', onKeydown);
@@ -256,18 +226,20 @@
 				/>
 			</ResponsiveSection>
 
-			{#if params.waveform === 'square'}
-				<ResponsiveSection title="DUTY CYCLE">
-					<PixelSlider
-						label="Width"
-						min={0}
-						max={1}
-						step={0.01}
-						value={params.dutyCycle}
-						onChange={(value) => void applyParam('dutyCycle', value)}
-					/>
-				</ResponsiveSection>
-			{/if}
+			<ResponsiveSection title="DUTY CYCLE">
+				<PixelSlider
+					label="Width"
+					min={0}
+					max={1}
+					step={0.01}
+					value={params.dutyCycle}
+					disabled={params.waveform !== 'square'}
+					onChange={(value) => void applyParam('dutyCycle', value)}
+				/>
+				{#if params.waveform !== 'square'}
+					<p class="section-note">DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.</p>
+				{/if}
+			</ResponsiveSection>
 
 			<ResponsiveSection title="EFFECTS">
 				<PixelSlider
@@ -425,6 +397,12 @@
 		padding: 0.9rem;
 		font-size: 0.75rem;
 		box-shadow: 4px 4px 0 #000;
+	}
+
+	.section-note {
+		margin: 0;
+		font-size: 0.52rem;
+		color: var(--yellow);
 	}
 
 	.audio-hint {

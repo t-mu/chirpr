@@ -111,4 +111,14 @@ describe('Dashboard', () => {
 		expect(params.frequency).toBe(DEFAULT_PARAMS.frequency);
 		expect(mockUpdateParams).toHaveBeenCalledWith(DEFAULT_PARAMS);
 	});
+
+	it('shows duty-cycle disabled note when waveform is not square', async () => {
+		const { findByRole, queryByText, queryAllByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		const sawButton = await findByRole('button', { name: 'Saw' });
+
+		expect(queryByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.')).toBeNull();
+		await fireEvent.click(sawButton);
+		expect(queryAllByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.').length).toBe(1);
+	});
 });
