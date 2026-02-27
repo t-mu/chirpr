@@ -169,6 +169,8 @@ describe('Dashboard', () => {
 		expect(getByText('Flanger Depth')).toBeTruthy();
 		expect(getByText('Flanger Feedback')).toBeTruthy();
 		expect(getByText('Flanger Mix')).toBeTruthy();
+		expect(getByText('Bit Depth')).toBeTruthy();
+		expect(getByText('Sample Rate Reduction')).toBeTruthy();
 	});
 
 	it('updates flanger depth parameter when slider changes', async () => {
@@ -185,6 +187,22 @@ describe('Dashboard', () => {
 		await fireEvent.input(input as HTMLInputElement, { target: { value: '0.42' } });
 
 		expect(mockUpdateParams).toHaveBeenCalledWith({ flangerDepth: 0.42 });
+	});
+
+	it('updates sample rate reduction when slider changes', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const input = getByText('Sample Rate Reduction').closest('label')?.querySelector('input');
+		expect(input).toBeTruthy();
+
+		await fireEvent.input(input as HTMLInputElement, { target: { value: '12' } });
+
+		expect(mockUpdateParams).toHaveBeenCalledWith({ sampleRateReduction: 12 });
 	});
 
 	it('restarts playback when duration changes while playing', async () => {

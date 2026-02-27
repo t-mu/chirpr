@@ -38,6 +38,7 @@ export const EFFECTS_SLIDERS: DashboardSliderConfig[] = [
 	{ key: 'lpfCutoff', label: 'LPF Cutoff' },
 	{ key: 'hpfCutoff', label: 'HPF Cutoff' },
 	{ key: 'bitDepth', label: 'Bit Depth' },
+	{ key: 'sampleRateReduction', label: 'Sample Rate Reduction' },
 	{ key: 'retriggerRate', label: 'Retrigger' },
 	{ key: 'retriggerCount', label: 'Retrigger Count' }
 ];
