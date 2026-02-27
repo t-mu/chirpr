@@ -896,6 +896,7 @@ The loop fires correctly at `1 / retriggerRate` Hz — there is no count limitin
 ## Task 18 — Larger PixelToggle Hit Targets
 
 **Goal:** The waveform and arpeggio toggle buttons are hard to click/tap because their hit area is too small. Increase button size to be at least 2× taller and 4× wider than the current size.
+**Status:** Done
 
 ### Current Dimensions
 

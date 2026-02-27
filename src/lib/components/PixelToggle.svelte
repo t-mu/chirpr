@@ -36,9 +36,10 @@
 		border: 2px solid var(--accent, #00e5ff);
 		background: transparent;
 		color: inherit;
-		padding: 0.5rem 0.65rem;
+		padding: 1rem 2.5rem;
 		font: inherit;
 		font-size: 0.6rem;
+		min-width: 4rem;
 	}
 
 	button.active {
