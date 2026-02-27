@@ -62,7 +62,7 @@
 			await initAudio();
 			const synth = await ensureSynth();
 			previewSound(synth);
-		}, 150);
+		}, 100);
 	}
 
 	async function ensureSynth(): Promise<SynthesizerAPI> {
