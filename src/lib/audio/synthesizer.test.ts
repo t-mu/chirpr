@@ -7,6 +7,7 @@ const state = vi.hoisted(() => {
 		frequency: { value: number };
 		triggerAttack: ReturnType<typeof vi.fn>;
 		triggerAttackRelease: ReturnType<typeof vi.fn>;
+		triggerRelease: ReturnType<typeof vi.fn>;
 	}> = [];
 	const noiseSynthInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
 	const patternInstances: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
@@ -247,6 +248,17 @@ describe('synthesizer', () => {
 		synth.play();
 
 		expect(firstSynth.triggerAttackRelease).toHaveBeenCalledWith(1234, 0.3);
+	});
+
+	it('starts and stops held preview on synth voices', async () => {
+		const synth = await createSynthesizer({ frequency: 777 });
+		const firstSynth = state.synthInstances[0];
+
+		synth.startPreview();
+		expect(firstSynth.triggerAttack).toHaveBeenCalledWith(777);
+
+		synth.stopPreview();
+		expect(firstSynth.triggerRelease).toHaveBeenCalled();
 	});
 
 	it('stop cancels transport before stop', async () => {

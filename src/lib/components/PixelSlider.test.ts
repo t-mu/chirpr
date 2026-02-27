@@ -31,4 +31,27 @@ describe('PixelSlider', () => {
 		expect(onChange).toHaveBeenCalledWith(880);
 		expect(component).toBeTruthy();
 	});
+
+	it('emits drag lifecycle callbacks', async () => {
+		const onDragStart = vi.fn();
+		const onDragEnd = vi.fn();
+		const { getByRole } = render(PixelSlider, {
+			props: {
+				label: 'Frequency',
+				min: 20,
+				max: 2000,
+				step: 1,
+				value: 440,
+				onDragStart,
+				onDragEnd
+			}
+		});
+		const slider = getByRole('slider');
+
+		await fireEvent.pointerDown(slider);
+		await fireEvent.pointerUp(slider);
+
+		expect(onDragStart).toHaveBeenCalledOnce();
+		expect(onDragEnd).toHaveBeenCalledOnce();
+	});
 });

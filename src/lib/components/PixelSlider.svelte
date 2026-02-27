@@ -8,11 +8,25 @@
 		unit?: string;
 		disabled?: boolean;
 		onChange?: (value: number) => void;
+		onDragStart?: () => void;
+		onDragEnd?: () => void;
 	}
 
-	let { label, min, max, step, value, unit = '', disabled = false, onChange }: Props = $props();
+	let {
+		label,
+		min,
+		max,
+		step,
+		value,
+		unit = '',
+		disabled = false,
+		onChange,
+		onDragStart,
+		onDragEnd
+	}: Props = $props();
 	let flash = $state(false);
 	let flashTimeout: number | undefined;
+	let dragging = $state(false);
 
 	$effect(() => {
 		return () => {
@@ -37,11 +51,56 @@
 		triggerFlash();
 		onChange?.(nextValue);
 	}
+
+	function beginDrag(): void {
+		if (disabled || dragging) return;
+		dragging = true;
+		onDragStart?.();
+	}
+
+	function endDrag(): void {
+		if (!dragging) return;
+		dragging = false;
+		onDragEnd?.();
+	}
+
+	function handleKeydown(event: KeyboardEvent): void {
+		if (
+			event.key === 'ArrowLeft' ||
+			event.key === 'ArrowRight' ||
+			event.key === 'ArrowUp' ||
+			event.key === 'ArrowDown' ||
+			event.key === 'PageUp' ||
+			event.key === 'PageDown' ||
+			event.key === 'Home' ||
+			event.key === 'End'
+		) {
+			beginDrag();
+		}
+	}
+
+	function handleKeyup(): void {
+		endDrag();
+	}
 </script>
 
 <label class="pixel-slider">
 	<span class="pixel-slider__label">{label}</span>
-	<input type="range" {min} {max} {step} {value} {disabled} oninput={handleInput} />
+	<input
+		type="range"
+		{min}
+		{max}
+		{step}
+		{value}
+		{disabled}
+		oninput={handleInput}
+		onpointerdown={beginDrag}
+		onpointerup={endDrag}
+		onpointercancel={endDrag}
+		onkeydown={handleKeydown}
+		onkeyup={handleKeyup}
+		onblur={endDrag}
+	/>
 	<span class="pixel-slider__value" class:flash>{value}{unit}</span>
 </label>
 

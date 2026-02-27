@@ -11,6 +11,10 @@
 	import RandomizerPanel from '$lib/components/RandomizerPanel.svelte';
 	import ExportPanel from '$lib/components/ExportPanel.svelte';
 	import { createDashboardKeydownHandler } from '$lib/components/dashboardShortcuts';
+	import {
+		createDashboardPreviewController,
+		RETRIGGER_REQUIRED_PARAMS
+	} from '$lib/components/dashboardPreviewController';
 	import { params, resetParams, setParams, updateParam } from '$lib/stores/synthParams.svelte';
 	import {
 		DEFAULT_PARAMS,
@@ -24,7 +28,6 @@
 	let audioInitAttempted = $state(false);
 	let lastRandomCategory = $state<SoundCategory>('shoot');
 	let playTimeout = $state<number | null>(null);
-	let previewDebounce = $state<number | null>(null);
 
 	const waveformSource = {
 		getValue: () => synthesizer?.getWaveformData() ?? new Float32Array(1024)
@@ -37,32 +40,18 @@
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
 
-	const requiresPlaybackRestart = new Set<keyof SynthParams>([
-		'duration',
-		'arpSpeed',
-		'retriggerRate',
-		'retriggerCount'
-	]);
-
 	async function applyParam<K extends keyof SynthParams>(
 		key: K,
 		value: SynthParams[K]
 	): Promise<void> {
 		updateParam(key, value);
 		synthesizer?.updateParams({ [key]: params[key] });
-		if (isPlaying && synthesizer && requiresPlaybackRestart.has(key)) {
+		if (isPlaying && synthesizer && RETRIGGER_REQUIRED_PARAMS.has(key)) {
 			restartPlayback(synthesizer);
+			return;
 		}
-		if (previewDebounce !== null) {
-			clearTimeout(previewDebounce);
-		}
-		previewDebounce = window.setTimeout(async () => {
-			previewDebounce = null;
-			if (isPlaying) return;
-			await initAudio();
-			const synth = await ensureSynth();
-			previewSound(synth);
-		}, 100);
+		if (isPlaying) return;
+		previewController.scheduleIdlePreview();
 	}
 
 	async function ensureSynth(): Promise<SynthesizerAPI> {
@@ -78,16 +67,10 @@
 		}
 	}
 
-	function clearPreviewDebounce(): void {
-		if (previewDebounce !== null) {
-			clearTimeout(previewDebounce);
-			previewDebounce = null;
-		}
-	}
-
 	async function togglePlay(): Promise<void> {
 		await initAudio();
 		const synth = await ensureSynth();
+		await previewController.stopAll();
 		if (isPlaying) {
 			synth.stop();
 			isPlaying = false;
@@ -117,6 +100,21 @@
 		synth.play();
 	}
 
+	const previewController = createDashboardPreviewController({
+		ensureSynth,
+		initAudio,
+		isPlaying: () => isPlaying,
+		previewOneShot: previewSound
+	});
+
+	function onSliderDragStart(): void {
+		void previewController.onDragStart();
+	}
+
+	function onSliderDragEnd(): void {
+		previewController.onDragEnd();
+	}
+
 	async function applyRandomCategory(category: SoundCategory): Promise<void> {
 		lastRandomCategory = category;
 		const next = randomize(category);
@@ -125,6 +123,7 @@
 		// Without it, the AudioContext stays suspended and previewSound produces no output.
 		await initAudio();
 		const synth = await ensureSynth();
+		await previewController.stopAll();
 		synth.updateParams(next);
 		previewSound(synth);
 	}
@@ -163,7 +162,7 @@
 		return () => {
 			window.removeEventListener('keydown', onKeydown);
 			clearPlayTimeout();
-			clearPreviewDebounce();
+			void previewController.stopAll();
 			synthesizer?.dispose();
 		};
 	});
@@ -198,6 +197,8 @@
 					value={params.frequency}
 					unit="Hz"
 					onChange={(value) => void applyParam('frequency', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Detune"
@@ -207,6 +208,8 @@
 					value={params.detune}
 					unit="c"
 					onChange={(value) => void applyParam('detune', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 			</ResponsiveSection>
 
@@ -218,6 +221,8 @@
 					step={0.001}
 					value={params.attack}
 					onChange={(value) => void applyParam('attack', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Decay"
@@ -226,6 +231,8 @@
 					step={0.001}
 					value={params.decay}
 					onChange={(value) => void applyParam('decay', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Sustain"
@@ -234,6 +241,8 @@
 					step={0.01}
 					value={params.sustain}
 					onChange={(value) => void applyParam('sustain', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Release"
@@ -242,6 +251,8 @@
 					step={0.001}
 					value={params.release}
 					onChange={(value) => void applyParam('release', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 			</ResponsiveSection>
 
@@ -254,6 +265,8 @@
 					value={params.dutyCycle}
 					disabled={params.waveform !== 'square'}
 					onChange={(value) => void applyParam('dutyCycle', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				{#if params.waveform !== 'square'}
 					<p class="section-note">DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.</p>
@@ -269,6 +282,8 @@
 					value={params.vibratoRate}
 					unit="Hz"
 					onChange={(value) => void applyParam('vibratoRate', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Vibrato Depth"
@@ -277,6 +292,8 @@
 					step={0.01}
 					value={params.vibratoDepth}
 					onChange={(value) => void applyParam('vibratoDepth', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Arp Speed"
@@ -286,6 +303,8 @@
 					value={params.arpSpeed}
 					unit="Hz"
 					onChange={(value) => void applyParam('arpSpeed', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Flanger Rate"
@@ -295,6 +314,8 @@
 					value={params.flangerRate}
 					unit="Hz"
 					onChange={(value) => void applyParam('flangerRate', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Flanger Depth"
@@ -303,6 +324,8 @@
 					step={0.01}
 					value={params.flangerDepth}
 					onChange={(value) => void applyParam('flangerDepth', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Flanger Feedback"
@@ -311,6 +334,8 @@
 					step={0.01}
 					value={params.flangerFeedback}
 					onChange={(value) => void applyParam('flangerFeedback', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Flanger Mix"
@@ -319,6 +344,8 @@
 					step={0.01}
 					value={params.flangerWet}
 					onChange={(value) => void applyParam('flangerWet', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="LPF Cutoff"
@@ -328,6 +355,8 @@
 					value={params.lpfCutoff}
 					unit="Hz"
 					onChange={(value) => void applyParam('lpfCutoff', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="HPF Cutoff"
@@ -337,6 +366,8 @@
 					value={params.hpfCutoff}
 					unit="Hz"
 					onChange={(value) => void applyParam('hpfCutoff', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Bit Depth"
@@ -345,6 +376,8 @@
 					step={1}
 					value={params.bitDepth}
 					onChange={(value) => void applyParam('bitDepth', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Retrigger"
@@ -353,6 +386,8 @@
 					step={0.1}
 					value={params.retriggerRate}
 					onChange={(value) => void applyParam('retriggerRate', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Retrigger Count"
@@ -361,6 +396,8 @@
 					step={1}
 					value={params.retriggerCount}
 					onChange={(value) => void applyParam('retriggerCount', value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
 				/>
 			</ResponsiveSection>
 		</div>
@@ -378,6 +415,8 @@
 				value={params.duration}
 				unit="ms"
 				onChange={(value) => void applyParam('duration', value)}
+				onDragStart={onSliderDragStart}
+				onDragEnd={onSliderDragEnd}
 			/>
 
 			<button class="play-button" type="button" onclick={() => void togglePlay()}>

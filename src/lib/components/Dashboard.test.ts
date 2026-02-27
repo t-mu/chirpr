@@ -4,15 +4,25 @@ import Dashboard from './Dashboard.svelte';
 import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
 import { params, resetParams, updateParam } from '$lib/stores/synthParams.svelte';
 
-const { mockPlay, mockStop, mockUpdateParams, mockDispose, mockRandomize, mockInitAudio } =
-	vi.hoisted(() => ({
-		mockPlay: vi.fn(),
-		mockStop: vi.fn(),
-		mockUpdateParams: vi.fn(),
-		mockDispose: vi.fn(),
-		mockRandomize: vi.fn(),
-		mockInitAudio: vi.fn(async () => {})
-	}));
+const {
+	mockPlay,
+	mockStartPreview,
+	mockStopPreview,
+	mockStop,
+	mockUpdateParams,
+	mockDispose,
+	mockRandomize,
+	mockInitAudio
+} = vi.hoisted(() => ({
+	mockPlay: vi.fn(),
+	mockStartPreview: vi.fn(),
+	mockStopPreview: vi.fn(),
+	mockStop: vi.fn(),
+	mockUpdateParams: vi.fn(),
+	mockDispose: vi.fn(),
+	mockRandomize: vi.fn(),
+	mockInitAudio: vi.fn(async () => {})
+}));
 
 vi.mock('tone', () => ({
 	Waveform: class {
@@ -33,6 +43,8 @@ vi.mock('$lib/audio/randomizer', () => ({
 vi.mock('$lib/audio/synthesizer', () => ({
 	createSynthesizer: vi.fn(async () => ({
 		play: mockPlay,
+		startPreview: mockStartPreview,
+		stopPreview: mockStopPreview,
 		stop: mockStop,
 		updateParams: mockUpdateParams,
 		getWaveformData: () => new Float32Array(1024),
@@ -49,6 +61,8 @@ afterEach(() => {
 	document.body.innerHTML = '';
 	resetParams();
 	mockPlay.mockClear();
+	mockStartPreview.mockClear();
+	mockStopPreview.mockClear();
 	mockStop.mockClear();
 	mockUpdateParams.mockClear();
 	mockDispose.mockClear();
@@ -85,8 +99,8 @@ describe('Dashboard', () => {
 		await fireEvent.keyDown(window, { code: 'KeyR' });
 
 		expect(mockRandomize).toHaveBeenCalledWith('shoot');
-		expect(mockUpdateParams).toHaveBeenCalledWith(expect.objectContaining({ frequency: 777 }));
 		await waitFor(() => {
+			expect(mockUpdateParams).toHaveBeenCalledWith(expect.objectContaining({ frequency: 777 }));
 			expect(mockPlay).toHaveBeenCalled();
 		});
 		expect(mockPlay).toHaveBeenLastCalledWith();
@@ -190,6 +204,27 @@ describe('Dashboard', () => {
 		await waitFor(() => {
 			expect(mockStop).toHaveBeenCalledTimes(1);
 			expect(mockPlay).toHaveBeenCalledTimes(2);
+		});
+	});
+
+	it('uses held preview while dragging sliders when idle', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		const slider = getByText('Frequency').closest('label')?.querySelector('input');
+		expect(slider).toBeTruthy();
+
+		await fireEvent.pointerDown(slider as HTMLInputElement);
+		await waitFor(() => {
+			expect(mockStartPreview).toHaveBeenCalledTimes(1);
+		});
+		expect(mockPlay).not.toHaveBeenCalled();
+
+		await fireEvent.input(slider as HTMLInputElement, { target: { value: '900' } });
+		expect(mockUpdateParams).toHaveBeenCalledWith({ frequency: 900 });
+
+		await fireEvent.pointerUp(slider as HTMLInputElement);
+		await waitFor(() => {
+			expect(mockStopPreview).toHaveBeenCalledTimes(1);
 		});
 	});
 });

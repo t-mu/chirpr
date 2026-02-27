@@ -9,6 +9,8 @@ import {
 
 export interface SynthesizerAPI {
 	play(note?: string | number): void;
+	startPreview(note?: string | number): void;
+	stopPreview(): void;
 	stop(): void;
 	updateParams(params: Partial<SynthParams>): void;
 	getWaveformData(): Float32Array;
@@ -49,6 +51,7 @@ class Synthesizer implements SynthesizerAPI {
 	private readonly retriggerLoop: Tone.Loop;
 	private voice: Voice;
 	private currentFrequency: number;
+	private isPreviewing = false;
 
 	private constructor(params: SynthParams, bitCrusherNode: BitCrusherNode) {
 		this.params = { ...params };
@@ -90,6 +93,7 @@ class Synthesizer implements SynthesizerAPI {
 	}
 
 	play(note?: string | number): void {
+		this.stopPreview();
 		if (typeof note === 'number') {
 			this.currentFrequency = clampFrequency(note);
 		} else if (typeof note === 'string') {
@@ -123,8 +127,33 @@ class Synthesizer implements SynthesizerAPI {
 		this.voice.triggerAttackRelease(this.currentFrequency, sec);
 	}
 
+	startPreview(note?: string | number): void {
+		this.stop();
+		if (typeof note === 'number') {
+			this.currentFrequency = clampFrequency(note);
+		} else if (typeof note === 'string') {
+			this.currentFrequency = Tone.Frequency(note).toFrequency();
+		} else {
+			this.currentFrequency = clampFrequency(this.params.frequency);
+		}
+
+		if (this.voice instanceof Tone.NoiseSynth) {
+			this.voice.triggerAttack();
+		} else {
+			this.voice.triggerAttack(this.currentFrequency);
+		}
+		this.isPreviewing = true;
+	}
+
+	stopPreview(): void {
+		if (!this.isPreviewing) return;
+		this.voice.triggerRelease();
+		this.isPreviewing = false;
+	}
+
 	stop(): void {
 		Tone.getTransport().cancel();
+		this.stopPreview();
 		this.voice.triggerRelease();
 		this.arpPattern.stop();
 		this.retriggerLoop.stop();
