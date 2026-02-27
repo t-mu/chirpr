@@ -248,7 +248,7 @@
 				{isPlaying ? '■ STOP' : '▶ PLAY'}
 			</button>
 
-			<PresetPanel />
+			<PresetPanel {synthesizer} />
 			<RandomizerPanel />
 			<ExportPanel />
 		</div>

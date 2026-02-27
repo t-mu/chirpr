@@ -3,6 +3,7 @@ import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
 
 beforeEach(() => {
 	localStorage.clear();
+	localStorage.setItem('sfx_initialized', '1');
 	vi.resetModules();
 	vi.stubGlobal('crypto', {
 		randomUUID: () => 'preset-id'
@@ -52,5 +53,14 @@ describe('presets store', () => {
 		const store = await importStore();
 
 		expect(store.presets).toEqual([]);
+	});
+
+	it('seeds factory presets once when initialization key is missing', async () => {
+		localStorage.clear();
+		vi.resetModules();
+		const store = await importStore();
+
+		expect(store.presets.length).toBeGreaterThanOrEqual(5);
+		expect(localStorage.getItem('sfx_initialized')).toBe('1');
 	});
 });

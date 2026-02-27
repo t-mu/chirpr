@@ -1,4 +1,4 @@
-import type { SynthParams } from '$lib/types/SynthParams';
+import { DEFAULT_PARAMS, type SynthParams } from '$lib/types/SynthParams';
 
 export interface Preset {
 	id: string;
@@ -8,6 +8,89 @@ export interface Preset {
 }
 
 const STORAGE_KEY = 'sfx_presets';
+const INITIALIZED_KEY = 'sfx_initialized';
+
+const FACTORY_PRESETS: Array<{ name: string; params: SynthParams }> = [
+	{
+		name: '8BIT LASER',
+		params: {
+			...DEFAULT_PARAMS,
+			waveform: 'square',
+			frequency: 1200,
+			attack: 0.001,
+			decay: 0.08,
+			sustain: 0,
+			release: 0.04,
+			bitDepth: 6
+		}
+	},
+	{
+		name: 'JUMP',
+		params: {
+			...DEFAULT_PARAMS,
+			waveform: 'sawtooth',
+			frequency: 820,
+			detune: 72,
+			attack: 0.002,
+			decay: 0.16,
+			release: 0.12
+		}
+	},
+	{
+		name: 'COIN',
+		params: {
+			...DEFAULT_PARAMS,
+			waveform: 'sine',
+			frequency: 1500,
+			attack: 0.001,
+			decay: 0.08,
+			sustain: 0,
+			release: 0.05,
+			arpSpeed: 12,
+			arpPattern: 'up'
+		}
+	},
+	{
+		name: 'EXPLODE',
+		params: {
+			...DEFAULT_PARAMS,
+			waveform: 'noise',
+			frequency: 160,
+			attack: 0.02,
+			decay: 0.75,
+			sustain: 0.1,
+			release: 0.5,
+			lpfCutoff: 900,
+			bitDepth: 4
+		}
+	},
+	{
+		name: 'POWER UP',
+		params: {
+			...DEFAULT_PARAMS,
+			waveform: 'square',
+			frequency: 960,
+			attack: 0.005,
+			decay: 0.2,
+			release: 0.18,
+			arpSpeed: 10,
+			arpPattern: 'up'
+		}
+	},
+	{
+		name: 'HIT',
+		params: {
+			...DEFAULT_PARAMS,
+			waveform: 'noise',
+			attack: 0.001,
+			decay: 0.12,
+			sustain: 0,
+			release: 0.06,
+			hpfCutoff: 400,
+			bitDepth: 5
+		}
+	}
+];
 
 function safeParsePresets(value: string | null): Preset[] {
 	if (!value) return [];
@@ -39,6 +122,17 @@ function persistPresets(next: Preset[]): void {
 }
 
 export const presets = $state<Preset[]>(loadInitialPresets());
+
+function initializeFactoryPresets(): void {
+	if (!canUseStorage()) return;
+	if (localStorage.getItem(INITIALIZED_KEY)) return;
+	for (const preset of FACTORY_PRESETS) {
+		savePreset(preset.name, preset.params);
+	}
+	localStorage.setItem(INITIALIZED_KEY, '1');
+}
+
+initializeFactoryPresets();
 
 export function savePreset(name: string, params: SynthParams): Preset {
 	const created: Preset = {
@@ -76,5 +170,7 @@ export function renamePreset(id: string, name: string): void {
 
 export function __resetPresetsForTests(): void {
 	presets.splice(0, presets.length);
-	persistPresets(presets);
+	if (canUseStorage()) {
+		localStorage.setItem(STORAGE_KEY, '[]');
+	}
 }
