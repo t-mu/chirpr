@@ -46,6 +46,29 @@ describe('dashboardPreviewController', () => {
 		expect(synth.startPreview).not.toHaveBeenCalled();
 	});
 
+	it('stops held preview when mode switches to sequenced', async () => {
+		let sequencedMode = false;
+		const synth = createSynthMock();
+		const controller = createDashboardPreviewController({
+			ensureSynth: vi.fn(async () => synth),
+			initAudio: vi.fn(async () => {}),
+			isPlaying: () => false,
+			isSequencedPreviewMode: () => sequencedMode,
+			previewOneShot: vi.fn()
+		});
+
+		await controller.onDragStart();
+		expect(synth.startPreview).toHaveBeenCalledTimes(1);
+		expect(synth.stopPreview).not.toHaveBeenCalled();
+
+		sequencedMode = true;
+		await controller.syncMode();
+		expect(synth.stopPreview).toHaveBeenCalledTimes(1);
+
+		await controller.onDragStart();
+		expect(synth.startPreview).toHaveBeenCalledTimes(1);
+	});
+
 	it('debounces idle one-shot preview', async () => {
 		vi.useFakeTimers();
 		try {
@@ -91,6 +114,29 @@ describe('dashboardPreviewController', () => {
 
 			expect(synth.stopPreview).toHaveBeenCalledTimes(1);
 			expect(previewOneShot).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('stops held preview after drag release delay', async () => {
+		vi.useFakeTimers();
+		try {
+			const synth = createSynthMock();
+			const controller = createDashboardPreviewController({
+				ensureSynth: vi.fn(async () => synth),
+				initAudio: vi.fn(async () => {}),
+				isPlaying: () => false,
+				isSequencedPreviewMode: () => false,
+				previewOneShot: vi.fn()
+			});
+
+			await controller.onDragStart();
+			controller.onDragEnd();
+			expect(synth.stopPreview).not.toHaveBeenCalled();
+
+			await vi.advanceTimersByTimeAsync(PREVIEW_CONFIG.heldPreviewReleaseMs);
+			expect(synth.stopPreview).toHaveBeenCalledTimes(1);
 		} finally {
 			vi.useRealTimers();
 		}

@@ -63,6 +63,7 @@
 	): Promise<void> {
 		updateParam(key, value);
 		synthesizer?.updateParams({ [key]: params[key] });
+		await previewController.syncMode();
 		if (isPlaying && synthesizer && requiresRetriggerOnChange(key)) {
 			restartPlayback(synthesizer);
 			return;

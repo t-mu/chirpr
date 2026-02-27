@@ -268,4 +268,57 @@ describe('Dashboard', () => {
 			expect(mockPlay).toHaveBeenCalledTimes(1);
 		});
 	});
+
+	it('skips held preview and uses one-shot preview when retrigger mode is enabled', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		const retriggerRateInput = getByText('Retrigger').closest('label')?.querySelector('input');
+		const retriggerCountInput = getByText('Retrigger Count')
+			.closest('label')
+			?.querySelector('input');
+		expect(retriggerRateInput).toBeTruthy();
+		expect(retriggerCountInput).toBeTruthy();
+		await fireEvent.input(retriggerRateInput as HTMLInputElement, { target: { value: '8' } });
+		await fireEvent.input(retriggerCountInput as HTMLInputElement, { target: { value: '4' } });
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalled();
+		});
+		mockPlay.mockClear();
+
+		const frequencyInput = getByText('Frequency').closest('label')?.querySelector('input');
+		expect(frequencyInput).toBeTruthy();
+		await fireEvent.pointerDown(frequencyInput as HTMLInputElement);
+		expect(mockStartPreview).not.toHaveBeenCalled();
+
+		await fireEvent.input(frequencyInput as HTMLInputElement, { target: { value: '880' } });
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+	});
+
+	it('stops held preview when switching to sequenced mode mid-drag', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		const frequencyInput = getByText('Frequency').closest('label')?.querySelector('input');
+		expect(frequencyInput).toBeTruthy();
+		await fireEvent.pointerDown(frequencyInput as HTMLInputElement);
+		await waitFor(() => {
+			expect(mockStartPreview).toHaveBeenCalledTimes(1);
+		});
+
+		const arpInput = getByText('Arp Speed').closest('label')?.querySelector('input');
+		expect(arpInput).toBeTruthy();
+		await fireEvent.input(arpInput as HTMLInputElement, { target: { value: '6' } });
+		await waitFor(() => {
+			expect(mockStopPreview).toHaveBeenCalledTimes(1);
+		});
+
+		await fireEvent.pointerUp(frequencyInput as HTMLInputElement);
+		mockStartPreview.mockClear();
+
+		await fireEvent.pointerDown(frequencyInput as HTMLInputElement);
+		expect(mockStartPreview).not.toHaveBeenCalled();
+	});
 });

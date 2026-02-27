@@ -301,4 +301,30 @@ describe('synthesizer', () => {
 		retriggerLoop.tick(1);
 		expect(firstSynth.triggerAttackRelease).toHaveBeenLastCalledWith(880, '16n', 1);
 	});
+
+	it('play clears active held preview before triggering one-shot note', async () => {
+		const synth = await createSynthesizer({ frequency: 660 });
+		const firstSynth = state.synthInstances[0];
+
+		synth.startPreview();
+		expect(firstSynth.triggerAttack).toHaveBeenCalledWith(660);
+		const releaseCallsBeforePlay = firstSynth.triggerRelease.mock.calls.length;
+
+		synth.play();
+		expect(firstSynth.triggerRelease).toHaveBeenCalledTimes(releaseCallsBeforePlay + 1);
+		expect(firstSynth.triggerAttackRelease).toHaveBeenCalledWith(660, 0.3);
+	});
+
+	it('keeps play behavior valid after waveform change during preview', async () => {
+		const synth = await createSynthesizer({ frequency: 440 });
+		const firstSynth = state.synthInstances[0];
+
+		synth.startPreview();
+		expect(firstSynth.triggerAttack).toHaveBeenCalledWith(440);
+
+		expect(() => synth.updateParams({ waveform: 'noise' })).not.toThrow();
+		expect(() => synth.play()).not.toThrow();
+		expect(state.noiseSynthInstances).toHaveLength(1);
+		expect(state.noiseSynthInstances[0].dispose).not.toHaveBeenCalled();
+	});
 });

@@ -533,10 +533,9 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 
 ---
 
-## Task 13 — Duration Slider & Play-Once Behaviour
+## ~~Task 13 — Duration Slider & Play-Once Behaviour~~ ✅ DONE
 
 **Goal:** Replace the forever-sustaining `triggerAttack` pattern with a one-shot play model. The user controls how long a sound lasts via a duration slider (50–2000 ms). Every slider interaction auto-previews the sound without requiring the user to press Play.
-**Status:** Done
 
 ### Steps
 
@@ -676,7 +675,7 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 
 ---
 
-## Task 14 — Fix Flanger (Tone.Chorus never started + missing UI controls)
+## ~~Task 14 — Fix Flanger (Tone.Chorus never started + missing UI controls)~~ ✅ DONE
 
 **Goal:** The flanger effect uses `Tone.Chorus` which requires `.start()` to activate its LFO. It also defaults `flangerWet: 0` so it produces no output even when `flangerRate` is non-zero. Add the missing `.start()` call and expose `flangerDepth` and `flangerWet` sliders so the effect is actually usable.
 
@@ -724,7 +723,7 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 
 ---
 
-## Task 15 — Fix Retrigger (permanently disabled due to retriggerCount gate)
+## ~~Task 15 — Fix Retrigger (permanently disabled due to retriggerCount gate)~~ ✅ DONE
 
 **Goal:** The retrigger effect is wired correctly in the audio engine but is permanently disabled. `isRetriggerEnabled` requires `retriggerCount > 0`, yet `retriggerCount` defaults to `0`, has no UI control, and is never used inside the `retriggerLoop` body to limit iterations. Simplify by removing `retriggerCount` entirely.
 
@@ -772,7 +771,7 @@ The loop fires correctly at `1 / retriggerRate` Hz — there is no count limitin
 
 ---
 
-## Task 16 — Arpeggio UI (pattern toggle + step preset picker)
+## ~~Task 16 — Arpeggio UI (pattern toggle + step preset picker)~~ ✅ DONE
 
 **Goal:** `arpPattern` and `arpSteps` exist in the data model and audio engine but have no UI controls. When `arpSpeed > 0` the arpeggio always plays the default major-chord steps in ascending order with no way to change either. Expose both controls, conditionally shown when arpeggio is active.
 
@@ -836,10 +835,9 @@ The loop fires correctly at `1 / retriggerRate` Hz — there is no count limitin
 
 ---
 
-## Task 17 — Export Uses Duration Slider
+## ~~Task 17 — Export Uses Duration Slider~~ ✅ DONE
 
 **Goal:** The export panel currently has its own local duration picker (a `<select>` with fixed options 0.5 s / 1 s / 2 s / 4 s) that is completely independent of the duration slider added in Task 13. The exported file should always match exactly what the user hears when pressing Play.
-**Status:** Done
 
 > **Depends on Task 13** — `params.duration` must exist before implementing this task.
 
@@ -893,10 +891,9 @@ The loop fires correctly at `1 / retriggerRate` Hz — there is no count limitin
 
 ---
 
-## Task 18 — Larger PixelToggle Hit Targets
+## ~~Task 18 — Larger PixelToggle Hit Targets~~ ✅ DONE
 
 **Goal:** The waveform and arpeggio toggle buttons are hard to click/tap because their hit area is too small. Increase button size to be at least 2× taller and 4× wider than the current size.
-**Status:** Done
 
 ### Current Dimensions
 
@@ -935,10 +932,9 @@ Approximate rendered size per button: ~28 px tall × ~40–50 px wide (depending
 
 ---
 
-## Task 19 — More Distinctive Section Headings
+## ~~Task 19 — More Distinctive Section Headings~~ ✅ DONE
 
 **Goal:** Section titles (OSCILLATOR, ENVELOPE, EFFECTS, etc.) currently render as plain text inside a `<header>` element at `0.68 rem`. Wrap each title in an `<h2>` element and increase the font size to `1.2 rem` so section breaks are visually distinct from the slider labels inside them.
-**Status:** Done
 
 ### Affected Files
 
@@ -1005,5 +1001,110 @@ Approximate rendered size per button: ~28 px tall × ~40–50 px wide (depending
 
 - No logic change — verify with `npm run check` (TypeScript + Svelte type checking) that no type errors are introduced
 - Manual: inspect rendered HTML in DevTools to confirm `<header><h2>OSCILLATOR</h2></header>` structure
+
+---
+
+## ~~Task 20 — Single Source of Truth for Param Metadata~~ ✅ DONE
+
+**Goal:** Remove duplicated numeric ranges and slider limits by defining one canonical parameter metadata map shared by UI, stores, and audio logic.
+
+### Steps
+
+1. Create `src/lib/types/paramMeta.ts` with a typed `PARAM_META` object:
+   - Include each numeric param key with `min`, `max`, `step`, optional `unit`, and `section`
+   - Keep it typed as `Record<NumericParamKey, ParamMeta>`
+2. Define `NumericParamKey` as `keyof SynthParams` filtered to numeric fields.
+3. Replace hard-coded range constants in `synthParams.svelte.ts` with values read from `PARAM_META`.
+4. Replace hard-coded slider min/max/step/unit values in `Dashboard.svelte` with metadata lookups.
+5. Replace any duplicated clamp ranges in `synthesizer.ts` where feasible by using shared constants.
+6. Add a runtime/dev assertion utility that checks every numeric key in `DEFAULT_PARAMS` exists in `PARAM_META`.
+7. Keep non-slider runtime-only guards explicit where required (e.g. waveform-specific handling), but source all numeric bounds from shared metadata.
+
+### Unit Tests
+
+- `paramMeta.test.ts`: every numeric key in `DEFAULT_PARAMS` has metadata.
+- `synthParams.test.ts`: clamping still works using metadata ranges.
+- `Dashboard.test.ts`: selected slider attributes (`min`, `max`, `step`) match metadata.
+
+---
+
+## ~~Task 21 — Compose Dashboard Sliders from Config~~ ✅ DONE
+
+**Goal:** Reduce `Dashboard.svelte` cognitive complexity and repetition by rendering sliders from section configs instead of hand-written repeated blocks.
+
+### Steps
+
+1. Create `src/lib/components/dashboardConfig.ts`:
+   - Define section arrays (e.g. oscillator, envelope, effects, playback)
+   - Each slider config contains key, label, visibility predicate, disabled predicate, and optional note text.
+2. Add a tiny presentational component `ParamSlider.svelte` that wraps `PixelSlider` wiring:
+   - Accepts `key`, `label`, metadata, `value`, `disabled`, `onChange`, `onDragStart`, `onDragEnd`.
+3. In `Dashboard.svelte`, map section configs into UI:
+   - Render visible sliders with `#each`
+   - Preserve existing section order and visuals.
+4. Keep non-generic controls explicit (waveform `PixelToggle`, oscilloscope, export, randomizer, presets).
+5. Centralize section notes (e.g. duty-cycle unavailable message) in config to avoid inline branching duplication.
+6. Keep `applyParam` and preview controller behavior unchanged to avoid regressions while refactoring.
+
+### Unit Tests
+
+- `dashboardConfig.test.ts`: visibility/disabled predicates behave correctly for key states.
+- `Dashboard.test.ts`: key controls still render and existing keyboard/audio behavior still passes.
+
+---
+
+## ~~Task 22 — Preview Controller Cleanup & Policy Explicitness~~ ✅ DONE
+
+**Goal:** Simplify preview policy internals, remove dead API, and make sequenced-mode behavior explicit and testable.
+
+### Steps
+
+1. Remove unused `clearPreviewDebounce` from `dashboardPreviewController.ts` return API.
+2. Extract policy helpers:
+   - `isSequencedMode(params)` (arp or retrigger active)
+   - `requiresRetriggerOnChange(paramKey)` for live playback behavior.
+3. Move timing constants (`PREVIEW_DEBOUNCE_MS`, held-release delay) into a dedicated exported config object.
+4. Ensure controller state transitions are explicit:
+   - idle, held-preview-active, sequenced-preview-debounced.
+5. Add comments for non-obvious behavior:
+   - why held preview is skipped in sequenced mode.
+6. Keep controller pure at boundaries by depending only on injected callbacks and state getters.
+
+### Unit Tests
+
+- New `dashboardPreviewController.test.ts`:
+  - held preview starts on drag in non-sequenced mode.
+  - held preview is skipped in sequenced mode.
+  - idle preview debounces correctly.
+  - `stopAll()` clears timers and active state.
+
+---
+
+## ~~Task 23 — Test Coverage Expansion for Sequenced Preview Modes~~ ✅ DONE
+
+**Goal:** Close behavior gaps by explicitly testing retrigger-mode preview behavior and mode switching transitions.
+
+### Steps
+
+1. Add `Dashboard.test.ts` case for retrigger-mode drag:
+   - set `retriggerRate > 0` and `retriggerCount > 0`
+   - verify no `startPreview` call on drag start
+   - verify one-shot preview path is used.
+2. Add test for mode transition:
+   - begin drag in non-sequenced mode (held preview starts)
+   - switch to sequenced mode
+   - verify held preview is stopped and subsequent drags do not restart held preview.
+3. Add synth-level test for preview lifecycle interactions:
+   - `play()` cancels active preview state.
+4. Add regression test for waveform change while previewing:
+   - ensure no throws and new voice keeps preview/play behavior.
+5. Add explicit assertions around calls to `stopPreview` when leaving held-preview path.
+
+### Unit Tests
+
+- Extend:
+  - `Dashboard.test.ts`
+  - `synthesizer.test.ts`
+  - `dashboardPreviewController.test.ts` (if added in Task 22)
 
 ---

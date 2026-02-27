@@ -63,7 +63,11 @@ export function createDashboardPreviewController(deps: PreviewControllerDeps) {
 		activeDragCount += 1;
 		clearHeldPreviewRelease();
 		clearPreviewDebounce();
-		if (deps.isSequencedPreviewMode()) return;
+		if (deps.isSequencedPreviewMode()) {
+			// Sequenced playback retriggers itself; a held note would mask that behavior.
+			await stopHeldPreview();
+			return;
+		}
 		if (isHeldPreviewActive || activeDragCount !== 1) return;
 
 		await deps.initAudio();
@@ -103,10 +107,17 @@ export function createDashboardPreviewController(deps: PreviewControllerDeps) {
 		await stopHeldPreview();
 	}
 
+	async function syncMode(): Promise<void> {
+		if (!deps.isSequencedPreviewMode()) return;
+		clearPreviewDebounce();
+		await stopHeldPreview();
+	}
+
 	return {
 		onDragStart,
 		onDragEnd,
 		scheduleIdlePreview,
+		syncMode,
 		stopAll
 	};
 }
