@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	optimizeDeps: {
-		include: ['tone']
+		include: ['tone', 'audiobuffer-to-wav', 'lamejs', 'wasm-media-encoders']
 	},
 	test: {
 		projects: [
