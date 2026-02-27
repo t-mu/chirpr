@@ -20,6 +20,14 @@ async function importStore() {
 }
 
 describe('presets store', () => {
+	it('returns empty preset list when storage is empty', async () => {
+		localStorage.removeItem('sfx_presets');
+		vi.resetModules();
+		const store = await importStore();
+
+		expect(store.presets).toEqual([]);
+	});
+
 	it('save -> load returns deep-equal params', async () => {
 		const store = await importStore();
 		const saved = store.savePreset('test', DEFAULT_PARAMS);

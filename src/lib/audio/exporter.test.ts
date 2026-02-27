@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { downloadBlob, exportMP3, exportWAV, renderToBuffer, toWavArrayBuffer } from './exporter';
+import {
+	downloadBlob,
+	exportMP3,
+	exportOGG,
+	exportWAV,
+	renderToBuffer,
+	toWavArrayBuffer
+} from './exporter';
 import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
 
 vi.mock('lamejs', () => {
@@ -9,6 +16,20 @@ vi.mock('lamejs', () => {
 		return { encodeBuffer, flush };
 	});
 	return { Mp3Encoder, __mocks: { encodeBuffer, flush } };
+});
+
+vi.mock('wasm-media-encoders', () => {
+	const configure = vi.fn();
+	const encode = vi.fn(() => new Uint8Array([9, 8, 7]));
+	const finalize = vi.fn(() => new Uint8Array([6, 5]));
+	return {
+		createOggEncoder: vi.fn(async () => ({
+			configure,
+			encode,
+			finalize
+		})),
+		__mocks: { configure, encode, finalize }
+	};
 });
 
 class MockOfflineAudioContext {
@@ -143,5 +164,27 @@ describe('exporter', () => {
 		const buffer = new MockOfflineAudioContext(1, 10, 44100).createBuffer(1, 10, 44100);
 		const wav = exportWAV(buffer);
 		expect(wav.type).toBe('audio/wav');
+	});
+
+	it('exportOGG configures and finalizes encoder output', async () => {
+		const buffer = new MockOfflineAudioContext(1, 10, 44100).createBuffer(1, 10, 44100);
+		const oggModule = (await import('wasm-media-encoders')) as unknown as {
+			__mocks: {
+				configure: ReturnType<typeof vi.fn>;
+				encode: ReturnType<typeof vi.fn>;
+				finalize: ReturnType<typeof vi.fn>;
+			};
+		};
+
+		const ogg = await exportOGG(buffer);
+
+		expect(oggModule.__mocks.configure).toHaveBeenCalledWith({
+			channels: 1,
+			sampleRate: 44100,
+			vbrQuality: 3
+		});
+		expect(oggModule.__mocks.encode).toHaveBeenCalled();
+		expect(oggModule.__mocks.finalize).toHaveBeenCalled();
+		expect(ogg.type).toBe('audio/ogg');
 	});
 });
