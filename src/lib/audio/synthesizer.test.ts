@@ -142,8 +142,12 @@ vi.mock('tone', () => {
 		Chorus: MockChorus,
 		Filter: MockFilter,
 		Waveform: MockWaveform,
-		Frequency: (note: string) => ({
-			transpose: (step: number) => ({ toNote: () => `${note}-${step}` })
+		Frequency: (note: string | number) => ({
+			toFrequency: () => (typeof note === 'number' ? note : 261.63),
+			transpose: (step: number) => ({
+				toNote: () => `${note}-${step}`,
+				toFrequency: () => (typeof note === 'number' ? note : 261.63) * Math.pow(2, step / 12)
+			})
 		}),
 		getContext: () => ({ rawContext: {} }),
 		getDestination: () => ({}),
@@ -225,8 +229,17 @@ describe('synthesizer', () => {
 
 		synth.play('C4');
 
-		expect(firstSynth.triggerAttackRelease).toHaveBeenCalledWith('C4', 0.3);
+		expect(firstSynth.triggerAttackRelease).toHaveBeenCalledWith(261.63, 0.3);
 		expect(firstSynth.triggerAttack).not.toHaveBeenCalled();
+	});
+
+	it('play without note uses current frequency param', async () => {
+		const synth = await createSynthesizer({ frequency: 1234 });
+		const firstSynth = state.synthInstances[0];
+
+		synth.play();
+
+		expect(firstSynth.triggerAttackRelease).toHaveBeenCalledWith(1234, 0.3);
 	});
 
 	it('stop cancels transport before stop', async () => {

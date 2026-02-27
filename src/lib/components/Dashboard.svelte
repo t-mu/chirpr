@@ -37,12 +37,22 @@
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
 
+	const requiresPlaybackRestart = new Set<keyof SynthParams>([
+		'duration',
+		'arpSpeed',
+		'retriggerRate',
+		'retriggerCount'
+	]);
+
 	async function applyParam<K extends keyof SynthParams>(
 		key: K,
 		value: SynthParams[K]
 	): Promise<void> {
 		updateParam(key, value);
 		synthesizer?.updateParams({ [key]: params[key] });
+		if (isPlaying && synthesizer && requiresPlaybackRestart.has(key)) {
+			restartPlayback(synthesizer);
+		}
 		if (previewDebounce !== null) {
 			clearTimeout(previewDebounce);
 		}
@@ -84,8 +94,12 @@
 			clearPlayTimeout();
 			return;
 		}
+		startPlayback(synth);
+	}
+
+	function startPlayback(synth: SynthesizerAPI): void {
 		clearPlayTimeout();
-		synth.play('C4');
+		synth.play();
 		isPlaying = true;
 		playTimeout = window.setTimeout(() => {
 			isPlaying = false;
@@ -93,9 +107,14 @@
 		}, params.duration);
 	}
 
+	function restartPlayback(synth: SynthesizerAPI): void {
+		synth.stop();
+		startPlayback(synth);
+	}
+
 	function previewSound(synth: SynthesizerAPI): void {
 		if (isPlaying) return;
-		synth.play('C4');
+		synth.play();
 	}
 
 	async function applyRandomCategory(category: SoundCategory): Promise<void> {
@@ -310,6 +329,14 @@
 					step={0.1}
 					value={params.retriggerRate}
 					onChange={(value) => void applyParam('retriggerRate', value)}
+				/>
+				<PixelSlider
+					label="Retrigger Count"
+					min={0}
+					max={16}
+					step={1}
+					value={params.retriggerCount}
+					onChange={(value) => void applyParam('retriggerCount', value)}
 				/>
 			</ResponsiveSection>
 		</div>

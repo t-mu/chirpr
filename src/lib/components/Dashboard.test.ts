@@ -70,6 +70,7 @@ describe('Dashboard', () => {
 		await waitFor(() => {
 			expect(mockPlay).toHaveBeenCalled();
 		});
+		expect(mockPlay).toHaveBeenLastCalledWith();
 		const playCalls = mockPlay.mock.calls.length;
 
 		const presetInput = getByLabelText('Preset name');
@@ -88,6 +89,7 @@ describe('Dashboard', () => {
 		await waitFor(() => {
 			expect(mockPlay).toHaveBeenCalled();
 		});
+		expect(mockPlay).toHaveBeenLastCalledWith();
 	});
 
 	it('S focuses preset name input', async () => {
@@ -120,5 +122,49 @@ describe('Dashboard', () => {
 		expect(queryByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.')).toBeNull();
 		await fireEvent.click(sawButton);
 		expect(queryAllByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.').length).toBe(1);
+	});
+
+	it('shows retrigger count slider', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		expect(getByText('Retrigger Count')).toBeTruthy();
+	});
+
+	it('restarts playback when duration changes while playing', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const durationInput = getByText('Duration').closest('label')?.querySelector('input');
+		expect(durationInput).toBeTruthy();
+		await fireEvent.input(durationInput as HTMLInputElement, { target: { value: '500' } });
+
+		await waitFor(() => {
+			expect(mockStop).toHaveBeenCalledTimes(1);
+			expect(mockPlay).toHaveBeenCalledTimes(2);
+		});
+	});
+
+	it('restarts playback when arp speed changes while playing', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const arpInput = getByText('Arp Speed').closest('label')?.querySelector('input');
+		expect(arpInput).toBeTruthy();
+		await fireEvent.input(arpInput as HTMLInputElement, { target: { value: '6' } });
+
+		await waitFor(() => {
+			expect(mockStop).toHaveBeenCalledTimes(1);
+			expect(mockPlay).toHaveBeenCalledTimes(2);
+		});
 	});
 });

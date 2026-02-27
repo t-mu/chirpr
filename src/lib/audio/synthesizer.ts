@@ -8,7 +8,7 @@ import {
 } from '$lib/types/SynthParams';
 
 export interface SynthesizerAPI {
-	play(note?: string): void;
+	play(note?: string | number): void;
 	stop(): void;
 	updateParams(params: Partial<SynthParams>): void;
 	getWaveformData(): Float32Array;
@@ -48,7 +48,7 @@ class Synthesizer implements SynthesizerAPI {
 	private readonly arpPattern: Tone.Pattern<number>;
 	private readonly retriggerLoop: Tone.Loop;
 	private voice: Voice;
-	private currentNote = 'C4';
+	private currentFrequency: number;
 
 	private constructor(params: SynthParams, bitCrusherNode: BitCrusherNode) {
 		this.params = { ...params };
@@ -64,8 +64,8 @@ class Synthesizer implements SynthesizerAPI {
 					this.voice.triggerAttackRelease('16n', time);
 					return;
 				}
-				const note = Tone.Frequency(this.currentNote).transpose(step).toNote();
-				this.voice.triggerAttackRelease(note, '16n', time);
+				const frequency = Tone.Frequency(this.currentFrequency, 'hz').transpose(step).toFrequency();
+				this.voice.triggerAttackRelease(frequency, '16n', time);
 			},
 			orderArpSteps(this.params.arpSteps, this.params.arpPattern)
 		);
@@ -74,10 +74,11 @@ class Synthesizer implements SynthesizerAPI {
 				this.voice.triggerAttackRelease('16n', time);
 				return;
 			}
-			this.voice.triggerAttackRelease(this.currentNote, '16n', time);
+			this.voice.triggerAttackRelease(this.currentFrequency, '16n', time);
 		}, '16n');
 
 		this.voice = this.createVoice(this.params.waveform);
+		this.currentFrequency = clampFrequency(this.params.frequency);
 		this.rewireVoice();
 		this.applyParams(this.params);
 	}
@@ -88,8 +89,15 @@ class Synthesizer implements SynthesizerAPI {
 		return new Synthesizer(merged, bitCrusherNode);
 	}
 
-	play(note = 'C4'): void {
-		this.currentNote = note;
+	play(note?: string | number): void {
+		if (typeof note === 'number') {
+			this.currentFrequency = clampFrequency(note);
+		} else if (typeof note === 'string') {
+			this.currentFrequency = Tone.Frequency(note).toFrequency();
+		} else {
+			this.currentFrequency = clampFrequency(this.params.frequency);
+		}
+
 		const sec = this.params.duration / 1000;
 		if (isArpeggioEnabled(this.params)) {
 			this.scheduleTransportOneShot(sec, () => {
@@ -112,7 +120,7 @@ class Synthesizer implements SynthesizerAPI {
 			this.voice.triggerAttackRelease(sec);
 			return;
 		}
-		this.voice.triggerAttackRelease(note, sec);
+		this.voice.triggerAttackRelease(this.currentFrequency, sec);
 	}
 
 	stop(): void {
