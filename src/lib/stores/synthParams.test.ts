@@ -13,6 +13,11 @@ describe('synthParams store', () => {
 		expect(params.frequency).toBe(2000);
 	});
 
+	it('clamps duration to upper bound', () => {
+		updateParam('duration', 9999);
+		expect(params.duration).toBe(2000);
+	});
+
 	it('resetParams restores defaults', () => {
 		updateParam('frequency', 1000);
 		updateParam('detune', 50);

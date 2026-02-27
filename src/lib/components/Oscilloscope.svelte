@@ -1,8 +1,11 @@
 <script lang="ts">
-	import type { Waveform } from 'tone';
+	// Only the getValue method is needed; avoids importing the full Tone.Waveform class type.
+	interface WaveformReader {
+		getValue(): Float32Array;
+	}
 
 	interface Props {
-		waveform: Waveform;
+		waveform: WaveformReader;
 	}
 
 	let { waveform }: Props = $props();

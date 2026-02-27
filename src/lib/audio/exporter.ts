@@ -69,8 +69,9 @@ export async function renderToBuffer(
 	hpf.frequency.value = clamp(params.hpfCutoff, 20, 20000);
 	hpf.Q.value = clamp(params.hpfResonance, 0.1, 20);
 
-	hpf.connect(lpf);
-	lpf.connect(envelopeGain);
+	// Match the live synthesizer chain order: LPF first, then HPF.
+	lpf.connect(hpf);
+	hpf.connect(envelopeGain);
 
 	let workletNode: AudioWorkletNode | null = null;
 	try {
@@ -105,7 +106,7 @@ export async function renderToBuffer(
 	}
 
 	source.connect(workletNode);
-	workletNode.connect(hpf);
+	workletNode.connect(lpf);
 
 	applyEnvelope(envelopeGain, params, durationSeconds);
 	(source as OscillatorNode | AudioBufferSourceNode).start(0);

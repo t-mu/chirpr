@@ -28,9 +28,6 @@ export default defineConfig({
 					name: 'server',
 					environment: 'jsdom',
 					setupFiles: ['./vitest.setup.ts'],
-					alias: {
-						test: '$lib'
-					},
 					include: ['src/**/*.test.ts'],
 					exclude: ['src/lib/components/**/*.test.ts']
 				}

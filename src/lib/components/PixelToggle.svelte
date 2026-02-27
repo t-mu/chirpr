@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
-
 	export interface ToggleOption<T extends string = string> {
 		value: T;
 		label: string;
@@ -13,7 +11,6 @@
 	}
 
 	let { options, selected, onChange }: Props<string> = $props();
-	const dispatch = createEventDispatcher<{ change: string }>();
 </script>
 
 <div class="pixel-toggle" role="radiogroup">
@@ -21,10 +18,7 @@
 		<button
 			type="button"
 			class:active={option.value === selected}
-			onclick={() => {
-				onChange?.(option.value);
-				dispatch('change', option.value);
-			}}
+			onclick={() => onChange?.(option.value)}
 		>
 			{option.label}
 		</button>

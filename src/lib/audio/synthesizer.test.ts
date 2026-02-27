@@ -5,12 +5,16 @@ const state = vi.hoisted(() => {
 		dispose: ReturnType<typeof vi.fn>;
 		widthSetCalls: number;
 		frequency: { value: number };
+		triggerAttack: ReturnType<typeof vi.fn>;
+		triggerAttackRelease: ReturnType<typeof vi.fn>;
 	}> = [];
 	const noiseSynthInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
 	const patternInstances: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
 	const transport = {
 		start: vi.fn(),
-		stop: vi.fn()
+		stop: vi.fn(),
+		cancel: vi.fn(),
+		scheduleOnce: vi.fn()
 	};
 	const bitCrusher = {
 		bitDepth: { value: 16 },
@@ -67,6 +71,7 @@ vi.mock('tone', () => {
 	}
 
 	class TrackingNoiseSynth {
+		public envelope = { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.2 };
 		public triggerAttack = vi.fn();
 		public triggerAttackRelease = vi.fn();
 		public triggerRelease = vi.fn();
@@ -161,6 +166,8 @@ describe('synthesizer', () => {
 		state.patternInstances.length = 0;
 		state.transport.start.mockClear();
 		state.transport.stop.mockClear();
+		state.transport.cancel.mockClear();
+		state.transport.scheduleOnce.mockClear();
 		state.bitCrusher.connect.mockClear();
 		state.bitCrusher.dispose.mockClear();
 	});
@@ -207,8 +214,31 @@ describe('synthesizer', () => {
 		const pattern = state.patternInstances[0];
 
 		expect(() => synth.stop()).not.toThrow();
+		expect(state.transport.cancel).toHaveBeenCalledOnce();
 		expect(state.transport.stop).toHaveBeenCalledOnce();
 		expect(pattern.stop).toHaveBeenCalled();
+	});
+
+	it('play uses triggerAttackRelease for synth voices', async () => {
+		const synth = await createSynthesizer();
+		const firstSynth = state.synthInstances[0];
+
+		synth.play('C4');
+
+		expect(firstSynth.triggerAttackRelease).toHaveBeenCalledWith('C4', 0.3);
+		expect(firstSynth.triggerAttack).not.toHaveBeenCalled();
+	});
+
+	it('stop cancels transport before stop', async () => {
+		const synth = await createSynthesizer();
+
+		synth.stop();
+
+		expect(state.transport.cancel).toHaveBeenCalledOnce();
+		expect(state.transport.stop).toHaveBeenCalledOnce();
+		expect(state.transport.cancel.mock.invocationCallOrder[0]).toBeLessThan(
+			state.transport.stop.mock.invocationCallOrder[0]
+		);
 	});
 
 	it('clamps out-of-range frequency before applying to Tone', async () => {

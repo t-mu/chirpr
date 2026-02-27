@@ -27,6 +27,7 @@ export interface SynthParams {
 	sampleRateReduction: number;
 	retriggerRate: number;
 	retriggerCount: number;
+	duration: number;
 }
 
 export const DEFAULT_PARAMS: SynthParams = {
@@ -54,5 +55,6 @@ export const DEFAULT_PARAMS: SynthParams = {
 	bitDepth: 16,
 	sampleRateReduction: 1,
 	retriggerRate: 0,
-	retriggerCount: 0
+	retriggerCount: 0,
+	duration: 300
 };

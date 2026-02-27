@@ -29,7 +29,8 @@ const GLOBAL_NUMERIC_RANGES: Record<string, Range> = {
 	bitDepth: { min: 1, max: 16 },
 	sampleRateReduction: { min: 1, max: 32 },
 	retriggerRate: { min: 0, max: 20 },
-	retriggerCount: { min: 0, max: 16 }
+	retriggerCount: { min: 0, max: 16 },
+	duration: { min: 50, max: 2000 }
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -91,6 +92,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.sustain = randomBetween(0, 0.2);
 			output.release = randomBetween(0.01, 0.08);
 			output.bitDepth = randomInt(4, 10);
+			output.duration = randomBetween(100, 300);
 			break;
 		case 'jump':
 			output.waveform = 'sawtooth';
@@ -99,6 +101,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.decay = randomBetween(0.1, 0.28);
 			output.vibratoRate = randomBetween(2, 7);
 			output.vibratoDepth = randomBetween(0.05, 0.25);
+			output.duration = randomBetween(200, 500);
 			break;
 		case 'explosion':
 			output.waveform = 'noise';
@@ -110,6 +113,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.lpfCutoff = randomBetween(120, 1500);
 			output.bitDepth = randomInt(1, 6);
 			output.sampleRateReduction = randomInt(4, 20);
+			output.duration = randomBetween(600, 1500);
 			break;
 		case 'powerup':
 			output.waveform = 'square';
@@ -119,6 +123,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.attack = randomBetween(0.005, 0.05);
 			output.decay = randomBetween(0.08, 0.25);
 			output.release = randomBetween(0.08, 0.24);
+			output.duration = randomBetween(500, 1200);
 			break;
 		case 'coin':
 			output.waveform = randomWaveform(['sine', 'square']);
@@ -128,6 +133,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.decay = randomBetween(0.03, 0.1);
 			output.sustain = 0;
 			output.release = randomBetween(0.02, 0.1);
+			output.duration = randomBetween(100, 250);
 			break;
 		case 'hit':
 			output.waveform = 'noise';
@@ -137,6 +143,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.release = randomBetween(0.01, 0.08);
 			output.hpfCutoff = randomBetween(100, 1200);
 			output.bitDepth = randomInt(3, 8);
+			output.duration = randomBetween(80, 200);
 			break;
 		case 'blip':
 			output.waveform = 'sine';
@@ -145,6 +152,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.sustain = randomBetween(0, 0.1);
 			output.release = randomBetween(0.01, 0.06);
 			output.detune = randomBetween(-20, 20);
+			output.duration = randomBetween(50, 150);
 			break;
 	}
 

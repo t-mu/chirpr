@@ -55,4 +55,14 @@ describe('randomizer', () => {
 			expect(randomize('coin').arpPattern).toBe('up');
 		}
 	});
+
+	it('all categories generate duration within global bounds', () => {
+		for (const category of categories) {
+			for (let i = 0; i < 100; i += 1) {
+				const result = randomize(category);
+				expect(result.duration).toBeGreaterThanOrEqual(50);
+				expect(result.duration).toBeLessThanOrEqual(2000);
+			}
+		}
+	});
 });

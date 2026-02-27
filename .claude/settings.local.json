@@ -1,0 +1,10 @@
+{
+	"permissions": {
+		"allow": [
+			"WebSearch",
+			"WebFetch(domain:svelte.dev)",
+			"WebFetch(domain:tonejs.github.io)",
+			"WebFetch(domain:github.com)"
+		]
+	}
+}

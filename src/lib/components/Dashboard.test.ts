@@ -85,7 +85,9 @@ describe('Dashboard', () => {
 
 		expect(mockRandomize).toHaveBeenCalledWith('shoot');
 		expect(mockUpdateParams).toHaveBeenCalledWith(expect.objectContaining({ frequency: 777 }));
-		expect(mockPlay).toHaveBeenCalled();
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalled();
+		});
 	});
 
 	it('S focuses preset name input', async () => {

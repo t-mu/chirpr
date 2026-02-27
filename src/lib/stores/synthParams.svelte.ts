@@ -22,7 +22,8 @@ const NUMERIC_RANGES: Partial<Record<keyof SynthParams, { min: number; max: numb
 	bitDepth: { min: 1, max: 16 },
 	sampleRateReduction: { min: 1, max: 32 },
 	retriggerRate: { min: 0, max: 20 },
-	retriggerCount: { min: 0, max: 16 }
+	retriggerCount: { min: 0, max: 16 },
+	duration: { min: 50, max: 2000 }
 };
 
 const NUMERIC_KEYS = Object.keys(NUMERIC_RANGES) as Array<keyof SynthParams>;

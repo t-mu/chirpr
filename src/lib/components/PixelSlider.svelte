@@ -1,7 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
-	import { createEventDispatcher } from 'svelte';
-
 	interface Props {
 		label: string;
 		min: number;
@@ -13,9 +10,14 @@
 	}
 
 	let { label, min, max, step, value, unit = '', onChange }: Props = $props();
-	const dispatch = createEventDispatcher<{ change: number }>();
 	let flash = $state(false);
 	let flashTimeout: number | undefined;
+
+	$effect(() => {
+		return () => {
+			if (flashTimeout !== undefined) clearTimeout(flashTimeout);
+		};
+	});
 
 	function triggerFlash(): void {
 		flash = true;
@@ -32,14 +34,7 @@
 		const nextValue = Number(target.value);
 		triggerFlash();
 		onChange?.(nextValue);
-		dispatch('change', nextValue);
 	}
-
-	onDestroy(() => {
-		if (flashTimeout !== undefined) {
-			clearTimeout(flashTimeout);
-		}
-	});
 </script>
 
 <label class="pixel-slider">

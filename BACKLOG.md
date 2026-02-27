@@ -4,7 +4,7 @@
 
 ---
 
-## Task 1 — Project Scaffold & Configuration
+## ~~Task 1 — Project Scaffold & Configuration~~ ✅ DONE
 
 **Goal:** Bootstrap the SvelteKit project with all dependencies, tooling, and base configuration in place. Nothing should be built yet — this task is purely infrastructure.
 
@@ -36,7 +36,7 @@
 
 ---
 
-## Task 2 — BitCrusher AudioWorklet
+## ~~Task 2 — BitCrusher AudioWorklet~~ ✅ DONE
 
 **Goal:** Implement a custom `AudioWorkletProcessor` that performs bit-depth quantization and sample-rate reduction. This is the only audio primitive not provided by Tone.js and must be built and tested in isolation first.
 
@@ -94,7 +94,7 @@ Extract the quantization logic into a pure helper function `quantize(sample, bit
 
 ---
 
-## Task 3 — Audio Engine & Signal Chain
+## ~~Task 3 — Audio Engine & Signal Chain~~ ✅ DONE
 
 **Goal:** Wire the complete Tone.js signal chain from oscillator to output, expose a clean imperative API (`play`, `stop`, `updateParam`), and integrate the `BitCrusherNode` from Task 2.
 
@@ -156,7 +156,7 @@ Mock Tone.js nodes entirely — do not instantiate real audio nodes in jsdom. Ve
 
 ---
 
-## Task 4 — State Stores & SynthParams Type
+## ~~Task 4 — State Stores & SynthParams Type~~ ✅ DONE
 
 **Goal:** Define the canonical `SynthParams` type and build Svelte 5 rune-based reactive stores for synth state and localStorage-backed preset management.
 
@@ -232,7 +232,7 @@ Mock Tone.js nodes entirely — do not instantiate real audio nodes in jsdom. Ve
 
 ---
 
-## Task 5 — Core UI Components
+## ~~Task 5 — Core UI Components~~ ✅ DONE
 
 **Goal:** Build the reusable pixel art styled UI primitives that all sections of the dashboard will use.
 
@@ -286,7 +286,7 @@ Install `jest-canvas-mock` (or `vitest-canvas-mock`) and import it in the Vitest
 
 ---
 
-## Task 6 — Dashboard Layout
+## ~~Task 6 — Dashboard Layout~~ ✅ DONE
 
 **Goal:** Assemble the `Dashboard.svelte` main page — lay out all parameter groups using `SectionCard` and `PixelSlider` components, wired to the synth state store and audio engine.
 
@@ -313,7 +313,7 @@ Install `jest-canvas-mock` (or `vitest-canvas-mock`) and import it in the Vitest
 
 ---
 
-## Task 7 — Preset System
+## ~~Task 7 — Preset System~~ ✅ DONE
 
 **Goal:** Build the `PresetPanel` component with full CRUD UI, wired to the `presets` store from Task 4.
 
@@ -345,7 +345,7 @@ Install `jest-canvas-mock` (or `vitest-canvas-mock`) and import it in the Vitest
 
 ---
 
-## Task 8 — Randomizer
+## ~~Task 8 — Randomizer~~ ✅ DONE
 
 **Goal:** Implement per-category random preset generation. Each category produces a `SynthParams` object with values biased toward that sound type.
 
@@ -378,7 +378,7 @@ Install `jest-canvas-mock` (or `vitest-canvas-mock`) and import it in the Vitest
 
 ---
 
-## Task 9 — Export Pipeline
+## ~~Task 9 — Export Pipeline~~ ✅ DONE
 
 **Goal:** Render the current synth state to an audio buffer via `OfflineAudioContext` and encode it to WAV, MP3, and OGG for download.
 
@@ -433,7 +433,7 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 
 ---
 
-## Task 10 — Visual Polish & UX
+## ~~Task 10 — Visual Polish & UX~~ ✅ DONE
 
 **Goal:** Finalize the pixel art aesthetic, add micro-interactions, keyboard shortcuts, and make the UI feel complete.
 
@@ -470,7 +470,7 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 
 ---
 
-## Task 11 — Test Suite Completion
+## ~~Task 11 — Test Suite Completion~~ ✅ DONE
 
 **Goal:** Ensure all unit tests from previous tasks are written, passing, and achieving meaningful coverage on the pure logic modules.
 
@@ -503,7 +503,7 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 
 ---
 
-## Task 12 — Netlify Deployment
+## ~~Task 12 — Netlify Deployment~~ ✅ DONE
 
 **Goal:** Configure and ship the app to Netlify with a working production URL.
 
@@ -530,3 +530,308 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
 - [ ] WAV export works in production
 - [ ] OGG WASM loads correctly from CDN/static assets
 - [ ] No console errors in production build
+
+---
+
+## Task 13 — Duration Slider & Play-Once Behaviour
+
+**Goal:** Replace the forever-sustaining `triggerAttack` pattern with a one-shot play model. The user controls how long a sound lasts via a duration slider (50–2000 ms). Every slider interaction auto-previews the sound without requiring the user to press Play.
+**Status:** Done
+
+### Steps
+
+1. **`src/lib/types/SynthParams.ts`**
+   - Add `duration: number` to the `SynthParams` interface (range 50–2000 ms)
+   - Add `duration: 300` to `DEFAULT_PARAMS`
+
+2. **`src/lib/stores/synthParams.svelte.ts`**
+   - Add `duration: { min: 50, max: 2000 }` to `NUMERIC_RANGES` so `updateParam` clamps it correctly
+
+3. **`src/lib/audio/synthesizer.ts`** — replace `triggerAttack` with `triggerAttackRelease`:
+   ```ts
+   play(note = 'C4'): void {
+     this.currentNote = note;
+     const sec = this.params.duration / 1000;
+
+     if (isArpeggioEnabled(this.params)) {
+       Tone.getTransport().cancel();
+       this.retriggerLoop.stop();
+       this.arpPattern.start(0);
+       Tone.getTransport().start();
+       Tone.getTransport().scheduleOnce(() => {
+         this.arpPattern.stop();
+         Tone.getTransport().stop();
+       }, `+${sec}`);
+       return;
+     }
+     if (isRetriggerEnabled(this.params)) {
+       Tone.getTransport().cancel();
+       this.arpPattern.stop();
+       this.retriggerLoop.start(0);
+       Tone.getTransport().start();
+       Tone.getTransport().scheduleOnce(() => {
+         this.retriggerLoop.stop();
+         Tone.getTransport().stop();
+       }, `+${sec}`);
+       return;
+     }
+
+     if (this.voice instanceof Tone.NoiseSynth) {
+       this.voice.triggerAttackRelease(sec);
+     } else {
+       this.voice.triggerAttackRelease(note, sec);
+     }
+   }
+   ```
+   Update `stop()` to cancel any scheduled transport events before stopping:
+   ```ts
+   stop(): void {
+     Tone.getTransport().cancel();
+     this.voice.triggerRelease();
+     this.arpPattern.stop();
+     this.retriggerLoop.stop();
+     Tone.getTransport().stop();
+   }
+   ```
+
+4. **`src/lib/audio/randomizer.ts`**
+   - Add `duration: { min: 50, max: 2000 }` to `GLOBAL_NUMERIC_RANGES`
+   - Set category-appropriate duration defaults in `randomize()`:
+     - `shoot`: `randomBetween(100, 300)`
+     - `jump`: `randomBetween(200, 500)`
+     - `explosion`: `randomBetween(600, 1500)`
+     - `powerup`: `randomBetween(500, 1200)`
+     - `coin`: `randomBetween(100, 250)`
+     - `hit`: `randomBetween(80, 200)`
+     - `blip`: `randomBetween(50, 150)`
+
+5. **`src/lib/components/Dashboard.svelte`**
+
+   **Duration slider** — add to the right column, directly above the Play button:
+   ```svelte
+   <PixelSlider label="Duration" min={50} max={2000} step={10}
+     value={params.duration} unit="ms"
+     onChange={(v) => void applyParam('duration', v)} />
+   ```
+
+   **Play-once button behaviour** — replace `togglePlay` and remove `randomStopTimeout`:
+   ```ts
+   let playTimeout: number | null = null;
+
+   function clearPlayTimeout(): void {
+     if (playTimeout !== null) { clearTimeout(playTimeout); playTimeout = null; }
+   }
+
+   async function togglePlay(): Promise<void> {
+     await initAudio();
+     const synth = await ensureSynth();
+     if (isPlaying) {
+       synth.stop();
+       isPlaying = false;
+       clearPlayTimeout();
+       return;
+     }
+     synth.play('C4');
+     isPlaying = true;
+     playTimeout = window.setTimeout(() => {
+       isPlaying = false;
+       playTimeout = null;
+     }, params.duration);
+   }
+   ```
+   Call `clearPlayTimeout()` in the `onMount` cleanup alongside the existing `synthesizer?.dispose()`.
+
+   **Simplified `previewSound`** — `play()` now auto-stops; no manual timeout needed:
+   ```ts
+   function previewSound(synth: SynthesizerAPI): void {
+     if (isPlaying) return;
+     synth.play('C4');
+   }
+   ```
+
+   **Debounced auto-preview in `applyParam`** — fires ~150 ms after the last slider move:
+   ```ts
+   let previewDebounce: number | null = null;
+
+   async function applyParam<K extends keyof SynthParams>(key: K, value: SynthParams[K]): Promise<void> {
+     updateParam(key, value);
+     synthesizer?.updateParams({ [key]: params[key] });
+     if (previewDebounce !== null) clearTimeout(previewDebounce);
+     previewDebounce = window.setTimeout(async () => {
+       previewDebounce = null;
+       if (isPlaying) return;
+       await initAudio();
+       const synth = await ensureSynth();
+       previewSound(synth);
+     }, 150);
+   }
+   ```
+
+### Unit Tests
+
+- **`synthesizer.test.ts`**: `play()` calls `triggerAttackRelease` (not `triggerAttack`) on the voice mock
+- **`synthesizer.test.ts`**: `stop()` calls `Tone.getTransport().cancel()` before stopping
+- **`randomizer.test.ts`**: All 7 categories produce a `duration` within `[50, 2000]`
+- **`synthParams.test.ts`**: `updateParam('duration', 9999)` clamps to `2000`
+
+---
+
+## Task 14 — Fix Flanger (Tone.Chorus never started + missing UI controls)
+
+**Goal:** The flanger effect uses `Tone.Chorus` which requires `.start()` to activate its LFO. It also defaults `flangerWet: 0` so it produces no output even when `flangerRate` is non-zero. Add the missing `.start()` call and expose `flangerDepth` and `flangerWet` sliders so the effect is actually usable.
+
+### Root Cause
+
+`Tone.Chorus` extends `LFOEffect` — its internal LFO only runs after `.start()` is called. The constructor creates the node but the LFO is idle. `flangerWet` defaulting to `0` further ensures the effect is inaudible regardless.
+
+### Steps
+
+1. **`src/lib/audio/synthesizer.ts`**
+   - In `rewireVoice()` (called once from the constructor), add `this.chorus.start()` after the chain is connected:
+     ```ts
+     private rewireVoice(): void {
+       this.voice.connect(this.bitCrusherNode);
+       this.bitCrusherNode.connect(this.vibrato);
+       this.vibrato.connect(this.chorus);
+       this.chorus.connect(this.lpf);
+       this.lpf.connect(this.hpf);
+       this.hpf.connect(this.waveform);
+       this.hpf.connect(Tone.getDestination());
+       this.chorus.start(); // activate the LFO
+     }
+     ```
+
+2. **`src/lib/components/Dashboard.svelte`**
+   Add `flangerDepth` and `flangerWet` sliders directly after `flangerRate` in the EFFECTS section:
+   ```svelte
+   <PixelSlider label="Flanger Depth" min={0} max={1} step={0.01}
+     value={params.flangerDepth}
+     onChange={(v) => void applyParam('flangerDepth', v)} />
+   <PixelSlider label="Flanger Wet" min={0} max={1} step={0.01}
+     value={params.flangerWet}
+     onChange={(v) => void applyParam('flangerWet', v)} />
+   ```
+
+3. **`src/lib/audio/randomizer.ts`**
+   Add flanger params to categories where a chorus/flanger effect fits:
+   - `powerup`: `flangerRate: randomBetween(1, 6)`, `flangerDepth: randomBetween(0.2, 0.6)`, `flangerWet: randomBetween(0.2, 0.5)`
+   - `jump`: `flangerRate: randomBetween(0, 4)`, `flangerDepth: randomBetween(0, 0.3)`, `flangerWet: randomBetween(0, 0.3)`
+
+### Unit Tests
+
+- **`synthesizer.test.ts`**: After `Synthesizer.create()`, `chorus.start` has been called on the mock
+- Manual: set `flangerRate: 5`, `flangerDepth: 0.5`, `flangerWet: 0.6` → audible chorus/flanger on a sustained tone
+
+---
+
+## Task 15 — Fix Retrigger (permanently disabled due to retriggerCount gate)
+
+**Goal:** The retrigger effect is wired correctly in the audio engine but is permanently disabled. `isRetriggerEnabled` requires `retriggerCount > 0`, yet `retriggerCount` defaults to `0`, has no UI control, and is never used inside the `retriggerLoop` body to limit iterations. Simplify by removing `retriggerCount` entirely.
+
+### Root Cause
+
+```ts
+// Current — broken: retriggerCount = 0 by default, no UI to change it
+const isRetriggerEnabled = (params: SynthParams): boolean =>
+  params.retriggerRate > 0 && params.retriggerCount > 0;
+```
+
+The loop fires correctly at `1 / retriggerRate` Hz — there is no count limiting code anywhere. `retriggerCount` is dead state.
+
+### Steps
+
+1. **`src/lib/types/SynthParams.ts`**
+   - Remove `retriggerCount: number` from the `SynthParams` interface
+   - Remove `retriggerCount` from `DEFAULT_PARAMS`
+
+2. **`src/lib/stores/synthParams.svelte.ts`**
+   - Remove `retriggerCount` from `NUMERIC_RANGES`
+
+3. **`src/lib/audio/synthesizer.ts`**
+   - Change the gate:
+     ```ts
+     // Before
+     const isRetriggerEnabled = (params: SynthParams): boolean =>
+       params.retriggerRate > 0 && params.retriggerCount > 0;
+     // After
+     const isRetriggerEnabled = (params: SynthParams): boolean =>
+       params.retriggerRate > 0;
+     ```
+   - In `updateParams`, remove the line `merged.retriggerCount = 0` from the arpeggio conflict guard
+
+4. **`src/lib/audio/randomizer.ts`**
+   - Remove `retriggerCount` from `GLOBAL_NUMERIC_RANGES`
+   - In `randomize()`, remove any `retriggerCount` assignments
+
+5. Update all test files that reference `retriggerCount` to remove those fields from test fixtures
+
+### Unit Tests
+
+- **`synthesizer.test.ts`**: Setting `retriggerRate: 5` (and nothing else) starts the retrigger loop — previously this was impossible without also setting `retriggerCount`
+- **`synthParams.test.ts`**: `DEFAULT_PARAMS` no longer contains `retriggerCount`
+
+---
+
+## Task 16 — Arpeggio UI (pattern toggle + step preset picker)
+
+**Goal:** `arpPattern` and `arpSteps` exist in the data model and audio engine but have no UI controls. When `arpSpeed > 0` the arpeggio always plays the default major-chord steps in ascending order with no way to change either. Expose both controls, conditionally shown when arpeggio is active.
+
+### Steps
+
+1. **`src/lib/components/Dashboard.svelte`** — show arp controls only when `params.arpSpeed > 0`:
+
+   ```svelte
+   {#if params.arpSpeed > 0}
+     <PixelToggle
+       options={[
+         { value: 'up',     label: 'Up'  },
+         { value: 'down',   label: 'Dn'  },
+         { value: 'random', label: 'Rnd' }
+       ]}
+       selected={params.arpPattern}
+       onChange={(v) => void applyParam('arpPattern', v as ArpPattern)}
+     />
+     <PixelToggle
+       options={arpStepPresets.map(p => ({ value: p.label, label: p.label }))}
+       selected={currentArpPresetLabel()}
+       onChange={(label) => applyArpSteps(label)}
+     />
+   {/if}
+   ```
+
+   In the script block, define preset step arrays and a label-resolver:
+   ```ts
+   import type { ArpPattern } from '$lib/types/SynthParams';
+
+   const ARP_STEP_PRESETS = [
+     { label: 'Oct', steps: [0, 12]    },
+     { label: 'Maj', steps: [0, 4, 7]  },
+     { label: 'Min', steps: [0, 3, 7]  },
+     { label: '5th', steps: [0, 7]     },
+     { label: 'Dim', steps: [0, 3, 6]  },
+   ] as const;
+
+   function currentArpPresetLabel(): string {
+     const current = JSON.stringify([...params.arpSteps].sort((a, b) => a - b));
+     return ARP_STEP_PRESETS.find(
+       p => JSON.stringify([...p.steps].sort((a, b) => a - b)) === current
+     )?.label ?? 'Maj';
+   }
+
+   function applyArpSteps(label: string): void {
+     const preset = ARP_STEP_PRESETS.find(p => p.label === label);
+     if (preset) void applyParam('arpSteps', [...preset.steps]);
+   }
+   ```
+
+2. **`src/lib/audio/randomizer.ts`** — ensure categories that use arpeggio also set a random pattern:
+   - `coin`: add `arpPattern: randomChoice(['up', 'down'] as ArpPattern[])`
+   - `powerup`: add `arpPattern: randomChoice(['up', 'random'] as ArpPattern[])`, randomize `arpSteps` from presets
+
+### Unit Tests
+
+- **`randomizer.test.ts`**: `randomize('powerup')` always produces `arpSpeed > 0`
+- **`randomizer.test.ts`**: `randomize('coin')` always produces `arpPattern` of either `'up'` or `'down'`
+- Manual: set `arpSpeed > 0` → arp UI appears; switching pattern/steps changes the audible sequence
+
+---

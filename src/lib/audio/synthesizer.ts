@@ -90,35 +90,47 @@ class Synthesizer implements SynthesizerAPI {
 
 	play(note = 'C4'): void {
 		this.currentNote = note;
+		const sec = this.params.duration / 1000;
 		if (isArpeggioEnabled(this.params)) {
+			this.scheduleTransportOneShot(sec, () => {
+				this.arpPattern.stop();
+			});
 			this.retriggerLoop.stop();
 			this.arpPattern.start(0);
-			Tone.getTransport().start();
 			return;
 		}
 		if (isRetriggerEnabled(this.params)) {
+			this.scheduleTransportOneShot(sec, () => {
+				this.retriggerLoop.stop();
+			});
 			this.arpPattern.stop();
 			this.retriggerLoop.start(0);
-			Tone.getTransport().start();
 			return;
 		}
 
 		if (this.voice instanceof Tone.NoiseSynth) {
-			this.voice.triggerAttack();
+			this.voice.triggerAttackRelease(sec);
 			return;
 		}
-		this.voice.triggerAttack(note);
+		this.voice.triggerAttackRelease(note, sec);
 	}
 
 	stop(): void {
-		if (this.voice instanceof Tone.NoiseSynth) {
-			this.voice.triggerRelease();
-		} else {
-			this.voice.triggerRelease();
-		}
+		Tone.getTransport().cancel();
+		this.voice.triggerRelease();
 		this.arpPattern.stop();
 		this.retriggerLoop.stop();
 		Tone.getTransport().stop();
+	}
+
+	private scheduleTransportOneShot(durationSec: number, stopSequence: () => void): void {
+		const transport = Tone.getTransport();
+		transport.cancel();
+		transport.start();
+		transport.scheduleOnce(() => {
+			stopSequence();
+			transport.stop();
+		}, `+${durationSec}`);
 	}
 
 	updateParams(next: Partial<SynthParams>): void {
@@ -139,7 +151,9 @@ class Synthesizer implements SynthesizerAPI {
 			this.voice.disconnect();
 			this.voice.dispose();
 			this.voice = this.createVoice(merged.waveform);
-			this.rewireVoice();
+			// Only reconnect voice to the first node — the rest of the chain is already wired.
+			// Calling rewireVoice() here would duplicate every downstream connection.
+			this.voice.connect(this.bitCrusherNode);
 		}
 
 		this.applyParams(merged);
@@ -182,21 +196,24 @@ class Synthesizer implements SynthesizerAPI {
 
 	private applyParams(params: SynthParams): void {
 		if (this.voice instanceof Tone.Synth) {
-			const oscillatorType =
-				params.waveform === 'noise'
-					? 'sine'
-					: params.waveform === 'square'
-						? 'square'
-						: params.waveform;
-			this.voice.oscillator.type = oscillatorType;
 			if (params.waveform === 'square') {
+				// 'pulse' is Tone.js's name for a variable-width square wave.
 				this.voice.oscillator.type = 'pulse';
 				if (this.voice.oscillator.width) {
 					this.voice.oscillator.width.value = clamp(params.dutyCycle, 0, 1);
 				}
+			} else {
+				// waveform is 'sawtooth' or 'sine' here; 'noise' uses NoiseSynth.
+				this.voice.oscillator.type = params.waveform as OscillatorType;
 			}
 			this.voice.frequency.value = params.frequency;
 			this.voice.detune.value = clamp(params.detune, -100, 100);
+			this.voice.envelope.attack = clamp(params.attack, 0.001, 2);
+			this.voice.envelope.decay = clamp(params.decay, 0.001, 2);
+			this.voice.envelope.sustain = clamp(params.sustain, 0, 1);
+			this.voice.envelope.release = clamp(params.release, 0.001, 5);
+		} else if (this.voice instanceof Tone.NoiseSynth) {
+			// NoiseSynth has no oscillator, but its envelope must still be kept in sync.
 			this.voice.envelope.attack = clamp(params.attack, 0.001, 2);
 			this.voice.envelope.decay = clamp(params.decay, 0.001, 2);
 			this.voice.envelope.sustain = clamp(params.sustain, 0, 1);

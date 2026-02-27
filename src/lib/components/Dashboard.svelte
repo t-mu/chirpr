@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { Waveform } from 'tone';
 	import { initAudio } from '$lib/audio/engine';
 	import { randomize, type SoundCategory } from '$lib/audio/randomizer';
 	import { createSynthesizer, type SynthesizerAPI } from '$lib/audio/synthesizer';
@@ -22,11 +21,12 @@
 	let isPlaying = $state(false);
 	let isBooting = $state(true);
 	let lastRandomCategory = $state<SoundCategory>('shoot');
-	let randomStopTimeout = $state<number | null>(null);
+	let playTimeout = $state<number | null>(null);
+	let previewDebounce = $state<number | null>(null);
 
 	const waveformSource = {
 		getValue: () => synthesizer?.getWaveformData() ?? new Float32Array(1024)
-	} as Waveform;
+	};
 
 	const waveformOptions = [
 		{ value: 'square', label: 'Square' },
@@ -41,6 +41,16 @@
 	): Promise<void> {
 		updateParam(key, value);
 		synthesizer?.updateParams({ [key]: params[key] });
+		if (previewDebounce !== null) {
+			clearTimeout(previewDebounce);
+		}
+		previewDebounce = window.setTimeout(async () => {
+			previewDebounce = null;
+			if (isPlaying) return;
+			await initAudio();
+			const synth = await ensureSynth();
+			previewSound(synth);
+		}, 150);
 	}
 
 	async function ensureSynth(): Promise<SynthesizerAPI> {
@@ -49,39 +59,50 @@
 		return synthesizer;
 	}
 
+	function clearPlayTimeout(): void {
+		if (playTimeout !== null) {
+			clearTimeout(playTimeout);
+			playTimeout = null;
+		}
+	}
+
+	function clearPreviewDebounce(): void {
+		if (previewDebounce !== null) {
+			clearTimeout(previewDebounce);
+			previewDebounce = null;
+		}
+	}
+
 	async function togglePlay(): Promise<void> {
 		await initAudio();
 		const synth = await ensureSynth();
 		if (isPlaying) {
 			synth.stop();
 			isPlaying = false;
+			clearPlayTimeout();
 			return;
 		}
+		clearPlayTimeout();
 		synth.play('C4');
 		isPlaying = true;
-	}
-
-	function clearRandomStopTimeout(): void {
-		if (randomStopTimeout !== null) {
-			clearTimeout(randomStopTimeout);
-			randomStopTimeout = null;
-		}
+		playTimeout = window.setTimeout(() => {
+			isPlaying = false;
+			playTimeout = null;
+		}, params.duration);
 	}
 
 	function previewSound(synth: SynthesizerAPI): void {
 		if (isPlaying) return;
 		synth.play('C4');
-		clearRandomStopTimeout();
-		randomStopTimeout = window.setTimeout(() => {
-			synth.stop();
-			randomStopTimeout = null;
-		}, 220);
 	}
 
 	async function applyRandomCategory(category: SoundCategory): Promise<void> {
 		lastRandomCategory = category;
 		const next = randomize(category);
 		setParams(next);
+		// initAudio() is called inside a gesture handler (button click), so it is safe here.
+		// Without it, the AudioContext stays suspended and previewSound produces no output.
+		await initAudio();
 		const synth = await ensureSynth();
 		synth.updateParams(next);
 		previewSound(synth);
@@ -150,7 +171,8 @@
 		})();
 		return () => {
 			window.removeEventListener('keydown', onKeydown);
-			clearRandomStopTimeout();
+			clearPlayTimeout();
+			clearPreviewDebounce();
 			synthesizer?.dispose();
 		};
 	});
@@ -327,6 +349,16 @@
 				<ResponsiveSection title="OSCILLOSCOPE" open={true}>
 					<Oscilloscope waveform={waveformSource} />
 				</ResponsiveSection>
+
+				<PixelSlider
+					label="Duration"
+					min={50}
+					max={2000}
+					step={10}
+					value={params.duration}
+					unit="ms"
+					onChange={(value) => void applyParam('duration', value)}
+				/>
 
 				<button class="play-button" type="button" onclick={() => void togglePlay()}>
 					{isPlaying ? '■ STOP' : '▶ PLAY'}
