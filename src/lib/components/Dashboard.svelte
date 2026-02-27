@@ -297,6 +297,30 @@
 					onChange={(value) => void applyParam('flangerRate', value)}
 				/>
 				<PixelSlider
+					label="Flanger Depth"
+					min={0}
+					max={1}
+					step={0.01}
+					value={params.flangerDepth}
+					onChange={(value) => void applyParam('flangerDepth', value)}
+				/>
+				<PixelSlider
+					label="Flanger Feedback"
+					min={0}
+					max={0.95}
+					step={0.01}
+					value={params.flangerFeedback}
+					onChange={(value) => void applyParam('flangerFeedback', value)}
+				/>
+				<PixelSlider
+					label="Flanger Mix"
+					min={0}
+					max={1}
+					step={0.01}
+					value={params.flangerWet}
+					onChange={(value) => void applyParam('flangerWet', value)}
+				/>
+				<PixelSlider
 					label="LPF Cutoff"
 					min={20}
 					max={20000}

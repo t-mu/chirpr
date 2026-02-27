@@ -130,6 +130,31 @@ describe('Dashboard', () => {
 		expect(getByText('Retrigger Count')).toBeTruthy();
 	});
 
+	it('shows flanger depth, feedback and mix sliders', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		expect(getByText('Flanger Depth')).toBeTruthy();
+		expect(getByText('Flanger Feedback')).toBeTruthy();
+		expect(getByText('Flanger Mix')).toBeTruthy();
+	});
+
+	it('updates flanger depth parameter when slider changes', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const input = getByText('Flanger Depth').closest('label')?.querySelector('input');
+		expect(input).toBeTruthy();
+
+		await fireEvent.input(input as HTMLInputElement, { target: { value: '0.42' } });
+
+		expect(mockUpdateParams).toHaveBeenCalledWith({ flangerDepth: 0.42 });
+	});
+
 	it('restarts playback when duration changes while playing', async () => {
 		const { findByRole, getByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });

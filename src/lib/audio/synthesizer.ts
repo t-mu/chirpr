@@ -154,6 +154,9 @@ class Synthesizer implements SynthesizerAPI {
 
 		const waveformChanged = merged.waveform !== this.params.waveform;
 		this.params = merged;
+		if (next.frequency !== undefined) {
+			this.currentFrequency = merged.frequency;
+		}
 
 		if (waveformChanged) {
 			this.voice.disconnect();

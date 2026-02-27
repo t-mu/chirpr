@@ -10,6 +10,7 @@ const state = vi.hoisted(() => {
 	}> = [];
 	const noiseSynthInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
 	const patternInstances: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
+	const loopInstances: Array<{ tick: (time?: number) => void }> = [];
 	const transport = {
 		start: vi.fn(),
 		stop: vi.fn(),
@@ -27,6 +28,7 @@ const state = vi.hoisted(() => {
 		synthInstances,
 		noiseSynthInstances,
 		patternInstances,
+		loopInstances,
 		transport,
 		bitCrusher
 	};
@@ -102,6 +104,10 @@ vi.mock('tone', () => {
 		public start = vi.fn();
 		public stop = vi.fn();
 		public dispose = vi.fn();
+
+		constructor(callback: (time?: number) => void) {
+			state.loopInstances.push({ tick: callback });
+		}
 	}
 
 	class MockVibrato {
@@ -168,6 +174,7 @@ describe('synthesizer', () => {
 		state.synthInstances.length = 0;
 		state.noiseSynthInstances.length = 0;
 		state.patternInstances.length = 0;
+		state.loopInstances.length = 0;
 		state.transport.start.mockClear();
 		state.transport.stop.mockClear();
 		state.transport.cancel.mockClear();
@@ -263,5 +270,23 @@ describe('synthesizer', () => {
 
 		synth.updateParams({ frequency: 99_999 });
 		expect(firstSynth.frequency.value).toBe(2000);
+	});
+
+	it('applies updated frequency to retrigger loop without replaying', async () => {
+		const synth = await createSynthesizer({
+			frequency: 440,
+			retriggerRate: 8,
+			retriggerCount: 2
+		});
+		const firstSynth = state.synthInstances[0];
+		const retriggerLoop = state.loopInstances[0];
+
+		synth.play();
+		retriggerLoop.tick(0);
+		expect(firstSynth.triggerAttackRelease).toHaveBeenLastCalledWith(440, '16n', 0);
+
+		synth.updateParams({ frequency: 880 });
+		retriggerLoop.tick(1);
+		expect(firstSynth.triggerAttackRelease).toHaveBeenLastCalledWith(880, '16n', 1);
 	});
 });
