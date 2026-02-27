@@ -21,7 +21,8 @@
 	import { createDashboardKeydownHandler } from '$lib/components/dashboardShortcuts';
 	import {
 		createDashboardPreviewController,
-		RETRIGGER_REQUIRED_PARAMS
+		isSequencedMode,
+		requiresRetriggerOnChange
 	} from '$lib/components/dashboardPreviewController';
 	import { params, resetParams, setParams, updateParam } from '$lib/stores/synthParams.svelte';
 	import {
@@ -53,9 +54,7 @@
 	}
 
 	function isSequencedPreviewMode(): boolean {
-		const isArp = params.arpSpeed > 0;
-		const isRetrigger = params.retriggerRate > 0 && params.retriggerCount > 0;
-		return isArp || isRetrigger;
+		return isSequencedMode(params);
 	}
 
 	async function applyParam<K extends keyof SynthParams>(
@@ -64,7 +63,7 @@
 	): Promise<void> {
 		updateParam(key, value);
 		synthesizer?.updateParams({ [key]: params[key] });
-		if (isPlaying && synthesizer && RETRIGGER_REQUIRED_PARAMS.has(key)) {
+		if (isPlaying && synthesizer && requiresRetriggerOnChange(key)) {
 			restartPlayback(synthesizer);
 			return;
 		}

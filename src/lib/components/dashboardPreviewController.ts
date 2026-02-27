@@ -1,16 +1,26 @@
 import type { SynthesizerAPI } from '$lib/audio/synthesizer';
 import type { SynthParams } from '$lib/types/SynthParams';
 
-const HELD_PREVIEW_RELEASE_MS = 120;
-export const PREVIEW_DEBOUNCE_MS = 100;
+export const PREVIEW_CONFIG = {
+	heldPreviewReleaseMs: 120,
+	previewDebounceMs: 100
+} as const;
 
-export const RETRIGGER_REQUIRED_PARAMS = new Set<keyof SynthParams>([
+const RETRIGGER_REQUIRED_PARAMS = new Set<keyof SynthParams>([
 	'duration',
 	'arpSpeed',
 	'retriggerRate',
 	'retriggerCount',
 	'waveform'
 ]);
+
+export function isSequencedMode(params: SynthParams): boolean {
+	return params.arpSpeed > 0 || (params.retriggerRate > 0 && params.retriggerCount > 0);
+}
+
+export function requiresRetriggerOnChange(paramKey: keyof SynthParams): boolean {
+	return RETRIGGER_REQUIRED_PARAMS.has(paramKey);
+}
 
 interface PreviewControllerDeps {
 	ensureSynth: () => Promise<SynthesizerAPI>;
@@ -71,7 +81,7 @@ export function createDashboardPreviewController(deps: PreviewControllerDeps) {
 		clearHeldPreviewRelease();
 		heldPreviewRelease = window.setTimeout(() => {
 			void stopHeldPreview();
-		}, HELD_PREVIEW_RELEASE_MS);
+		}, PREVIEW_CONFIG.heldPreviewReleaseMs);
 	}
 
 	function scheduleIdlePreview(): void {
@@ -83,7 +93,7 @@ export function createDashboardPreviewController(deps: PreviewControllerDeps) {
 			if (deps.isPlaying() || isHeldPreviewActive) return;
 			const synth = await deps.ensureSynth();
 			deps.previewOneShot(synth);
-		}, PREVIEW_DEBOUNCE_MS);
+		}, PREVIEW_CONFIG.previewDebounceMs);
 	}
 
 	async function stopAll(): Promise<void> {
@@ -97,7 +107,6 @@ export function createDashboardPreviewController(deps: PreviewControllerDeps) {
 		onDragStart,
 		onDragEnd,
 		scheduleIdlePreview,
-		stopAll,
-		clearPreviewDebounce
+		stopAll
 	};
 }
