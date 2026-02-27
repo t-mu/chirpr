@@ -249,7 +249,7 @@
 			</button>
 
 			<PresetPanel {synthesizer} />
-			<RandomizerPanel />
+			<RandomizerPanel {synthesizer} />
 			<ExportPanel />
 		</div>
 	</div>
