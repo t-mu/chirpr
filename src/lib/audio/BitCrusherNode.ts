@@ -56,7 +56,7 @@ export class BitCrusherNode extends ToneAudioNode {
 		}
 
 		await audioWorklet.addModule(workletUrl);
-		const node = new AudioWorkletNode(context.rawContext, 'bit-crusher');
+		const node = context.createAudioWorkletNode('bit-crusher');
 		return new BitCrusherNode(context, node);
 	}
 
