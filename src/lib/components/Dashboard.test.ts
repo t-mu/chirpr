@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard.svelte';
 import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
 import { params, resetParams, updateParam } from '$lib/stores/synthParams.svelte';
+import { PARAM_META } from '$lib/types/paramMeta';
 
 const {
 	mockPlay,
@@ -74,6 +75,23 @@ describe('Dashboard', () => {
 	it('renders play button immediately', () => {
 		const { getByRole } = render(Dashboard);
 		expect(getByRole('button', { name: '▶ PLAY' })).toBeTruthy();
+	});
+
+	it('uses shared metadata for slider bounds', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		const frequency = getByText('Frequency').closest('label')?.querySelector('input');
+		const duration = getByText('Duration').closest('label')?.querySelector('input');
+		expect(frequency).toBeTruthy();
+		expect(duration).toBeTruthy();
+
+		expect((frequency as HTMLInputElement).min).toBe(String(PARAM_META.frequency.min));
+		expect((frequency as HTMLInputElement).max).toBe(String(PARAM_META.frequency.max));
+		expect((frequency as HTMLInputElement).step).toBe(String(PARAM_META.frequency.step));
+		expect((duration as HTMLInputElement).min).toBe(String(PARAM_META.duration.min));
+		expect((duration as HTMLInputElement).max).toBe(String(PARAM_META.duration.max));
+		expect((duration as HTMLInputElement).step).toBe(String(PARAM_META.duration.step));
 	});
 
 	it('space toggles play and ignores input-focused shortcuts', async () => {

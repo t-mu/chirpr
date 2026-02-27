@@ -6,6 +6,7 @@ import {
 	DEFAULT_PARAMS,
 	type Waveform
 } from '$lib/types/SynthParams';
+import { clampParam } from '$lib/types/paramMeta';
 
 export interface SynthesizerAPI {
 	play(note?: string | number): void;
@@ -17,10 +18,7 @@ export interface SynthesizerAPI {
 	dispose(): void;
 }
 
-const clamp = (value: number, min: number, max: number): number =>
-	Math.max(min, Math.min(max, value));
-
-const clampFrequency = (value: number): number => clamp(value, 20, 2000);
+const clampFrequency = (value: number): number => clampParam('frequency', value);
 
 const isArpeggioEnabled = (params: SynthParams): boolean => params.arpSpeed > 0;
 
@@ -240,38 +238,41 @@ class Synthesizer implements SynthesizerAPI {
 				// 'pulse' is Tone.js's name for a variable-width square wave.
 				this.voice.oscillator.type = 'pulse';
 				if (this.voice.oscillator.width) {
-					this.voice.oscillator.width.value = clamp(params.dutyCycle, 0, 1);
+					this.voice.oscillator.width.value = clampParam('dutyCycle', params.dutyCycle);
 				}
 			} else {
 				// waveform is 'sawtooth' or 'sine' here; 'noise' uses NoiseSynth.
 				this.voice.oscillator.type = params.waveform as OscillatorType;
 			}
 			this.voice.frequency.value = params.frequency;
-			this.voice.detune.value = clamp(params.detune, -100, 100);
-			this.voice.envelope.attack = clamp(params.attack, 0.001, 2);
-			this.voice.envelope.decay = clamp(params.decay, 0.001, 2);
-			this.voice.envelope.sustain = clamp(params.sustain, 0, 1);
-			this.voice.envelope.release = clamp(params.release, 0.001, 5);
+			this.voice.detune.value = clampParam('detune', params.detune);
+			this.voice.envelope.attack = clampParam('attack', params.attack);
+			this.voice.envelope.decay = clampParam('decay', params.decay);
+			this.voice.envelope.sustain = clampParam('sustain', params.sustain);
+			this.voice.envelope.release = clampParam('release', params.release);
 		} else if (this.voice instanceof Tone.NoiseSynth) {
 			// NoiseSynth has no oscillator, but its envelope must still be kept in sync.
-			this.voice.envelope.attack = clamp(params.attack, 0.001, 2);
-			this.voice.envelope.decay = clamp(params.decay, 0.001, 2);
-			this.voice.envelope.sustain = clamp(params.sustain, 0, 1);
-			this.voice.envelope.release = clamp(params.release, 0.001, 5);
+			this.voice.envelope.attack = clampParam('attack', params.attack);
+			this.voice.envelope.decay = clampParam('decay', params.decay);
+			this.voice.envelope.sustain = clampParam('sustain', params.sustain);
+			this.voice.envelope.release = clampParam('release', params.release);
 		}
 
-		this.bitCrusherNode.bitDepth.value = clamp(params.bitDepth, 1, 16);
-		this.bitCrusherNode.sampleRateReduction.value = clamp(params.sampleRateReduction, 1, 32);
-		this.vibrato.frequency.value = clamp(params.vibratoRate, 0, 20);
-		this.vibrato.depth.value = clamp(params.vibratoDepth, 0, 1);
-		this.chorus.frequency.value = clamp(params.flangerRate, 0, 20);
-		this.chorus.depth = clamp(params.flangerDepth, 0, 1);
-		this.chorus.feedback.value = clamp(params.flangerFeedback, 0, 0.95);
-		this.chorus.wet.value = clamp(params.flangerWet, 0, 1);
-		this.lpf.frequency.value = clamp(params.lpfCutoff, 20, 20000);
-		this.lpf.Q.value = clamp(params.lpfResonance, 0.1, 20);
-		this.hpf.frequency.value = clamp(params.hpfCutoff, 20, 20000);
-		this.hpf.Q.value = clamp(params.hpfResonance, 0.1, 20);
+		this.bitCrusherNode.bitDepth.value = clampParam('bitDepth', params.bitDepth);
+		this.bitCrusherNode.sampleRateReduction.value = clampParam(
+			'sampleRateReduction',
+			params.sampleRateReduction
+		);
+		this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
+		this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
+		this.chorus.frequency.value = clampParam('flangerRate', params.flangerRate);
+		this.chorus.depth = clampParam('flangerDepth', params.flangerDepth);
+		this.chorus.feedback.value = clampParam('flangerFeedback', params.flangerFeedback);
+		this.chorus.wet.value = clampParam('flangerWet', params.flangerWet);
+		this.lpf.frequency.value = clampParam('lpfCutoff', params.lpfCutoff);
+		this.lpf.Q.value = clampParam('lpfResonance', params.lpfResonance);
+		this.hpf.frequency.value = clampParam('hpfCutoff', params.hpfCutoff);
+		this.hpf.Q.value = clampParam('hpfResonance', params.hpfResonance);
 
 		this.arpPattern.values = orderArpSteps(params.arpSteps, params.arpPattern);
 		this.arpPattern.interval = params.arpSpeed > 0 ? 1 / params.arpSpeed : 1;

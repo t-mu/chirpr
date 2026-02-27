@@ -21,6 +21,7 @@
 		type SynthParams,
 		type Waveform as WaveformType
 	} from '$lib/types/SynthParams';
+	import { PARAM_META } from '$lib/types/paramMeta';
 
 	let synthesizer = $state<SynthesizerAPI | null>(null);
 	let isPlaying = $state(false);
@@ -39,6 +40,7 @@
 		{ value: 'sine', label: 'Sine' },
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
+	const meta = PARAM_META;
 
 	function isSequencedPreviewMode(): boolean {
 		const isArp = params.arpSpeed > 0;
@@ -198,22 +200,22 @@
 				/>
 				<PixelSlider
 					label="Frequency"
-					min={20}
-					max={2000}
-					step={1}
+					min={meta.frequency.min}
+					max={meta.frequency.max}
+					step={meta.frequency.step}
 					value={params.frequency}
-					unit="Hz"
+					unit={meta.frequency.unit}
 					onChange={(value) => void applyParam('frequency', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Detune"
-					min={-100}
-					max={100}
-					step={1}
+					min={meta.detune.min}
+					max={meta.detune.max}
+					step={meta.detune.step}
 					value={params.detune}
-					unit="c"
+					unit={meta.detune.unit}
 					onChange={(value) => void applyParam('detune', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
@@ -223,9 +225,9 @@
 			<ResponsiveSection title="ENVELOPE">
 				<PixelSlider
 					label="Attack"
-					min={0.001}
-					max={2}
-					step={0.001}
+					min={meta.attack.min}
+					max={meta.attack.max}
+					step={meta.attack.step}
 					value={params.attack}
 					onChange={(value) => void applyParam('attack', value)}
 					onDragStart={onSliderDragStart}
@@ -233,9 +235,9 @@
 				/>
 				<PixelSlider
 					label="Decay"
-					min={0.001}
-					max={2}
-					step={0.001}
+					min={meta.decay.min}
+					max={meta.decay.max}
+					step={meta.decay.step}
 					value={params.decay}
 					onChange={(value) => void applyParam('decay', value)}
 					onDragStart={onSliderDragStart}
@@ -243,9 +245,9 @@
 				/>
 				<PixelSlider
 					label="Sustain"
-					min={0}
-					max={1}
-					step={0.01}
+					min={meta.sustain.min}
+					max={meta.sustain.max}
+					step={meta.sustain.step}
 					value={params.sustain}
 					onChange={(value) => void applyParam('sustain', value)}
 					onDragStart={onSliderDragStart}
@@ -253,9 +255,9 @@
 				/>
 				<PixelSlider
 					label="Release"
-					min={0.001}
-					max={5}
-					step={0.001}
+					min={meta.release.min}
+					max={meta.release.max}
+					step={meta.release.step}
 					value={params.release}
 					onChange={(value) => void applyParam('release', value)}
 					onDragStart={onSliderDragStart}
@@ -266,9 +268,9 @@
 			<ResponsiveSection title="DUTY CYCLE">
 				<PixelSlider
 					label="Width"
-					min={0}
-					max={1}
-					step={0.01}
+					min={meta.dutyCycle.min}
+					max={meta.dutyCycle.max}
+					step={meta.dutyCycle.step}
 					value={params.dutyCycle}
 					disabled={params.waveform !== 'square'}
 					onChange={(value) => void applyParam('dutyCycle', value)}
@@ -283,20 +285,20 @@
 			<ResponsiveSection title="EFFECTS">
 				<PixelSlider
 					label="Vibrato Rate"
-					min={0}
-					max={20}
-					step={0.1}
+					min={meta.vibratoRate.min}
+					max={meta.vibratoRate.max}
+					step={meta.vibratoRate.step}
 					value={params.vibratoRate}
-					unit="Hz"
+					unit={meta.vibratoRate.unit}
 					onChange={(value) => void applyParam('vibratoRate', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Vibrato Depth"
-					min={0}
-					max={1}
-					step={0.01}
+					min={meta.vibratoDepth.min}
+					max={meta.vibratoDepth.max}
+					step={meta.vibratoDepth.step}
 					value={params.vibratoDepth}
 					onChange={(value) => void applyParam('vibratoDepth', value)}
 					onDragStart={onSliderDragStart}
@@ -304,31 +306,31 @@
 				/>
 				<PixelSlider
 					label="Arp Speed"
-					min={0}
-					max={20}
-					step={0.1}
+					min={meta.arpSpeed.min}
+					max={meta.arpSpeed.max}
+					step={meta.arpSpeed.step}
 					value={params.arpSpeed}
-					unit="Hz"
+					unit={meta.arpSpeed.unit}
 					onChange={(value) => void applyParam('arpSpeed', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Flanger Rate"
-					min={0}
-					max={20}
-					step={0.1}
+					min={meta.flangerRate.min}
+					max={meta.flangerRate.max}
+					step={meta.flangerRate.step}
 					value={params.flangerRate}
-					unit="Hz"
+					unit={meta.flangerRate.unit}
 					onChange={(value) => void applyParam('flangerRate', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Flanger Depth"
-					min={0}
-					max={1}
-					step={0.01}
+					min={meta.flangerDepth.min}
+					max={meta.flangerDepth.max}
+					step={meta.flangerDepth.step}
 					value={params.flangerDepth}
 					onChange={(value) => void applyParam('flangerDepth', value)}
 					onDragStart={onSliderDragStart}
@@ -336,9 +338,9 @@
 				/>
 				<PixelSlider
 					label="Flanger Feedback"
-					min={0}
-					max={0.95}
-					step={0.01}
+					min={meta.flangerFeedback.min}
+					max={meta.flangerFeedback.max}
+					step={meta.flangerFeedback.step}
 					value={params.flangerFeedback}
 					onChange={(value) => void applyParam('flangerFeedback', value)}
 					onDragStart={onSliderDragStart}
@@ -346,9 +348,9 @@
 				/>
 				<PixelSlider
 					label="Flanger Mix"
-					min={0}
-					max={1}
-					step={0.01}
+					min={meta.flangerWet.min}
+					max={meta.flangerWet.max}
+					step={meta.flangerWet.step}
 					value={params.flangerWet}
 					onChange={(value) => void applyParam('flangerWet', value)}
 					onDragStart={onSliderDragStart}
@@ -356,31 +358,31 @@
 				/>
 				<PixelSlider
 					label="LPF Cutoff"
-					min={20}
-					max={20000}
-					step={1}
+					min={meta.lpfCutoff.min}
+					max={meta.lpfCutoff.max}
+					step={meta.lpfCutoff.step}
 					value={params.lpfCutoff}
-					unit="Hz"
+					unit={meta.lpfCutoff.unit}
 					onChange={(value) => void applyParam('lpfCutoff', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="HPF Cutoff"
-					min={20}
-					max={20000}
-					step={1}
+					min={meta.hpfCutoff.min}
+					max={meta.hpfCutoff.max}
+					step={meta.hpfCutoff.step}
 					value={params.hpfCutoff}
-					unit="Hz"
+					unit={meta.hpfCutoff.unit}
 					onChange={(value) => void applyParam('hpfCutoff', value)}
 					onDragStart={onSliderDragStart}
 					onDragEnd={onSliderDragEnd}
 				/>
 				<PixelSlider
 					label="Bit Depth"
-					min={1}
-					max={16}
-					step={1}
+					min={meta.bitDepth.min}
+					max={meta.bitDepth.max}
+					step={meta.bitDepth.step}
 					value={params.bitDepth}
 					onChange={(value) => void applyParam('bitDepth', value)}
 					onDragStart={onSliderDragStart}
@@ -388,9 +390,9 @@
 				/>
 				<PixelSlider
 					label="Retrigger"
-					min={0}
-					max={20}
-					step={0.1}
+					min={meta.retriggerRate.min}
+					max={meta.retriggerRate.max}
+					step={meta.retriggerRate.step}
 					value={params.retriggerRate}
 					onChange={(value) => void applyParam('retriggerRate', value)}
 					onDragStart={onSliderDragStart}
@@ -398,9 +400,9 @@
 				/>
 				<PixelSlider
 					label="Retrigger Count"
-					min={0}
-					max={16}
-					step={1}
+					min={meta.retriggerCount.min}
+					max={meta.retriggerCount.max}
+					step={meta.retriggerCount.step}
 					value={params.retriggerCount}
 					onChange={(value) => void applyParam('retriggerCount', value)}
 					onDragStart={onSliderDragStart}
@@ -416,11 +418,11 @@
 
 			<PixelSlider
 				label="Duration"
-				min={50}
-				max={2000}
-				step={10}
+				min={meta.duration.min}
+				max={meta.duration.max}
+				step={meta.duration.step}
 				value={params.duration}
-				unit="ms"
+				unit={meta.duration.unit}
 				onChange={(value) => void applyParam('duration', value)}
 				onDragStart={onSliderDragStart}
 				onDragEnd={onSliderDragEnd}
