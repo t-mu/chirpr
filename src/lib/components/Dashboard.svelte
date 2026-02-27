@@ -4,12 +4,20 @@
 	import { randomize, type SoundCategory } from '$lib/audio/randomizer';
 	import { createSynthesizer, type SynthesizerAPI } from '$lib/audio/synthesizer';
 	import Oscilloscope from '$lib/components/Oscilloscope.svelte';
-	import PixelSlider from '$lib/components/PixelSlider.svelte';
+	import ParamSlider from '$lib/components/ParamSlider.svelte';
 	import PixelToggle from '$lib/components/PixelToggle.svelte';
 	import ResponsiveSection from '$lib/components/ResponsiveSection.svelte';
 	import PresetPanel from '$lib/components/PresetPanel.svelte';
 	import RandomizerPanel from '$lib/components/RandomizerPanel.svelte';
 	import ExportPanel from '$lib/components/ExportPanel.svelte';
+	import {
+		DUTY_CYCLE_DISABLED_NOTE,
+		DUTY_CYCLE_SLIDERS,
+		EFFECTS_SLIDERS,
+		ENVELOPE_SLIDERS,
+		OSCILLATOR_SLIDERS,
+		PLAYBACK_SLIDERS
+	} from '$lib/components/dashboardConfig';
 	import { createDashboardKeydownHandler } from '$lib/components/dashboardShortcuts';
 	import {
 		createDashboardPreviewController,
@@ -21,7 +29,7 @@
 		type SynthParams,
 		type Waveform as WaveformType
 	} from '$lib/types/SynthParams';
-	import { PARAM_META } from '$lib/types/paramMeta';
+	import type { NumericParamKey } from '$lib/types/paramMeta';
 
 	let synthesizer = $state<SynthesizerAPI | null>(null);
 	let isPlaying = $state(false);
@@ -40,7 +48,9 @@
 		{ value: 'sine', label: 'Sine' },
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
-	const meta = PARAM_META;
+	function onSliderValueChange(paramKey: NumericParamKey, value: number): void {
+		void applyParam(paramKey, value as SynthParams[typeof paramKey]);
+	}
 
 	function isSequencedPreviewMode(): boolean {
 		const isArp = params.arpSpeed > 0;
@@ -198,216 +208,60 @@
 					selected={params.waveform}
 					onChange={(value) => void applyParam('waveform', value as WaveformType)}
 				/>
-				<PixelSlider
-					label="Frequency"
-					min={meta.frequency.min}
-					max={meta.frequency.max}
-					step={meta.frequency.step}
-					value={params.frequency}
-					unit={meta.frequency.unit}
-					onChange={(value) => void applyParam('frequency', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Detune"
-					min={meta.detune.min}
-					max={meta.detune.max}
-					step={meta.detune.step}
-					value={params.detune}
-					unit={meta.detune.unit}
-					onChange={(value) => void applyParam('detune', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
+				{#each OSCILLATOR_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
 			</ResponsiveSection>
 
 			<ResponsiveSection title="ENVELOPE">
-				<PixelSlider
-					label="Attack"
-					min={meta.attack.min}
-					max={meta.attack.max}
-					step={meta.attack.step}
-					value={params.attack}
-					onChange={(value) => void applyParam('attack', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Decay"
-					min={meta.decay.min}
-					max={meta.decay.max}
-					step={meta.decay.step}
-					value={params.decay}
-					onChange={(value) => void applyParam('decay', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Sustain"
-					min={meta.sustain.min}
-					max={meta.sustain.max}
-					step={meta.sustain.step}
-					value={params.sustain}
-					onChange={(value) => void applyParam('sustain', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Release"
-					min={meta.release.min}
-					max={meta.release.max}
-					step={meta.release.step}
-					value={params.release}
-					onChange={(value) => void applyParam('release', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
+				{#each ENVELOPE_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
 			</ResponsiveSection>
 
 			<ResponsiveSection title="DUTY CYCLE">
-				<PixelSlider
-					label="Width"
-					min={meta.dutyCycle.min}
-					max={meta.dutyCycle.max}
-					step={meta.dutyCycle.step}
-					value={params.dutyCycle}
-					disabled={params.waveform !== 'square'}
-					onChange={(value) => void applyParam('dutyCycle', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
+				{#each DUTY_CYCLE_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
+						disabled={slider.disabledWhen?.(params) ?? false}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
 				{#if params.waveform !== 'square'}
-					<p class="section-note">DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.</p>
+					<p class="section-note">{DUTY_CYCLE_DISABLED_NOTE}</p>
 				{/if}
 			</ResponsiveSection>
 
 			<ResponsiveSection title="EFFECTS">
-				<PixelSlider
-					label="Vibrato Rate"
-					min={meta.vibratoRate.min}
-					max={meta.vibratoRate.max}
-					step={meta.vibratoRate.step}
-					value={params.vibratoRate}
-					unit={meta.vibratoRate.unit}
-					onChange={(value) => void applyParam('vibratoRate', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Vibrato Depth"
-					min={meta.vibratoDepth.min}
-					max={meta.vibratoDepth.max}
-					step={meta.vibratoDepth.step}
-					value={params.vibratoDepth}
-					onChange={(value) => void applyParam('vibratoDepth', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Arp Speed"
-					min={meta.arpSpeed.min}
-					max={meta.arpSpeed.max}
-					step={meta.arpSpeed.step}
-					value={params.arpSpeed}
-					unit={meta.arpSpeed.unit}
-					onChange={(value) => void applyParam('arpSpeed', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Flanger Rate"
-					min={meta.flangerRate.min}
-					max={meta.flangerRate.max}
-					step={meta.flangerRate.step}
-					value={params.flangerRate}
-					unit={meta.flangerRate.unit}
-					onChange={(value) => void applyParam('flangerRate', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Flanger Depth"
-					min={meta.flangerDepth.min}
-					max={meta.flangerDepth.max}
-					step={meta.flangerDepth.step}
-					value={params.flangerDepth}
-					onChange={(value) => void applyParam('flangerDepth', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Flanger Feedback"
-					min={meta.flangerFeedback.min}
-					max={meta.flangerFeedback.max}
-					step={meta.flangerFeedback.step}
-					value={params.flangerFeedback}
-					onChange={(value) => void applyParam('flangerFeedback', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Flanger Mix"
-					min={meta.flangerWet.min}
-					max={meta.flangerWet.max}
-					step={meta.flangerWet.step}
-					value={params.flangerWet}
-					onChange={(value) => void applyParam('flangerWet', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="LPF Cutoff"
-					min={meta.lpfCutoff.min}
-					max={meta.lpfCutoff.max}
-					step={meta.lpfCutoff.step}
-					value={params.lpfCutoff}
-					unit={meta.lpfCutoff.unit}
-					onChange={(value) => void applyParam('lpfCutoff', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="HPF Cutoff"
-					min={meta.hpfCutoff.min}
-					max={meta.hpfCutoff.max}
-					step={meta.hpfCutoff.step}
-					value={params.hpfCutoff}
-					unit={meta.hpfCutoff.unit}
-					onChange={(value) => void applyParam('hpfCutoff', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Bit Depth"
-					min={meta.bitDepth.min}
-					max={meta.bitDepth.max}
-					step={meta.bitDepth.step}
-					value={params.bitDepth}
-					onChange={(value) => void applyParam('bitDepth', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Retrigger"
-					min={meta.retriggerRate.min}
-					max={meta.retriggerRate.max}
-					step={meta.retriggerRate.step}
-					value={params.retriggerRate}
-					onChange={(value) => void applyParam('retriggerRate', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-				<PixelSlider
-					label="Retrigger Count"
-					min={meta.retriggerCount.min}
-					max={meta.retriggerCount.max}
-					step={meta.retriggerCount.step}
-					value={params.retriggerCount}
-					onChange={(value) => void applyParam('retriggerCount', value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
+				{#each EFFECTS_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
+						disabled={slider.disabledWhen?.(params) ?? false}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
 			</ResponsiveSection>
 		</div>
 
@@ -416,17 +270,16 @@
 				<Oscilloscope waveform={waveformSource} />
 			</ResponsiveSection>
 
-			<PixelSlider
-				label="Duration"
-				min={meta.duration.min}
-				max={meta.duration.max}
-				step={meta.duration.step}
-				value={params.duration}
-				unit={meta.duration.unit}
-				onChange={(value) => void applyParam('duration', value)}
-				onDragStart={onSliderDragStart}
-				onDragEnd={onSliderDragEnd}
-			/>
+			{#each PLAYBACK_SLIDERS as slider (slider.key)}
+				<ParamSlider
+					paramKey={slider.key}
+					label={slider.label}
+					value={params[slider.key]}
+					onChange={(value) => onSliderValueChange(slider.key, value)}
+					onDragStart={onSliderDragStart}
+					onDragEnd={onSliderDragEnd}
+				/>
+			{/each}
 
 			<button class="play-button" type="button" onclick={() => void togglePlay()}>
 				{isPlaying ? '■ STOP' : '▶ PLAY'}
