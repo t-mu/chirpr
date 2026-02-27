@@ -1,6 +1,7 @@
 import { fireEvent, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ExportPanel from './ExportPanel.svelte';
+import { updateParam } from '$lib/stores/synthParams.svelte';
 
 const { renderToBuffer, exportWAV, exportMP3, exportOGG, downloadBlob } = vi.hoisted(() => ({
 	renderToBuffer: vi.fn(async () => ({}) as AudioBuffer),
@@ -20,6 +21,7 @@ vi.mock('$lib/audio/exporter', () => ({
 
 afterEach(() => {
 	document.body.innerHTML = '';
+	updateParam('duration', 300);
 	renderToBuffer.mockReset();
 	exportWAV.mockReset();
 	exportMP3.mockReset();
@@ -31,14 +33,13 @@ afterEach(() => {
 describe('ExportPanel', () => {
 	it('exports selected format and triggers download', async () => {
 		const { getByLabelText, getByRole, findByText } = render(ExportPanel);
-		const durationSelect = getByLabelText('Duration') as HTMLSelectElement;
 		const formatSelect = getByLabelText('Format') as HTMLSelectElement;
 
-		await fireEvent.change(durationSelect, { target: { value: '2' } });
+		updateParam('duration', 650);
 		await fireEvent.change(formatSelect, { target: { value: 'mp3' } });
 		await fireEvent.click(getByRole('button', { name: 'EXPORT' }));
 
-		expect(renderToBuffer).toHaveBeenCalledWith(expect.anything(), 2);
+		expect(renderToBuffer).toHaveBeenCalledWith(expect.anything(), 0.65);
 		expect(exportMP3).toHaveBeenCalledTimes(1);
 		expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'sfx.mp3');
 		expect(await findByText('DOWNLOADED!')).toBeTruthy();

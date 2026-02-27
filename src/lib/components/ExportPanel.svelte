@@ -12,7 +12,6 @@
 	type ExportFormat = 'wav' | 'mp3' | 'ogg';
 	type Exporter = (buffer: AudioBuffer) => Blob | Promise<Blob>;
 
-	let duration = $state(1);
 	let format = $state<ExportFormat>('wav');
 	let isExporting = $state(false);
 	let flashMessage = $state('');
@@ -44,7 +43,8 @@
 		isExporting = true;
 		flashMessage = '';
 		try {
-			const buffer = await renderToBuffer(params, duration);
+			const exportDurationSeconds = params.duration / 1000;
+			const buffer = await renderToBuffer(params, exportDurationSeconds);
 			const blob = await exporters[format](buffer);
 			downloadBlob(blob, `sfx.${format}`);
 			showFlash('DOWNLOADED!');
@@ -59,15 +59,6 @@
 <section class="panel">
 	<h3>EXPORT</h3>
 	<div class="controls">
-		<label>
-			Duration
-			<select bind:value={duration}>
-				<option value={0.5}>0.5s</option>
-				<option value={1}>1s</option>
-				<option value={2}>2s</option>
-				<option value={4}>4s</option>
-			</select>
-		</label>
 		<label>
 			Format
 			<select bind:value={format}>
@@ -106,7 +97,7 @@
 
 	.controls {
 		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: 1fr;
 		gap: 0.4rem;
 	}
 

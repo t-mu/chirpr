@@ -835,3 +835,173 @@ The loop fires correctly at `1 / retriggerRate` Hz — there is no count limitin
 - Manual: set `arpSpeed > 0` → arp UI appears; switching pattern/steps changes the audible sequence
 
 ---
+
+## Task 17 — Export Uses Duration Slider
+
+**Goal:** The export panel currently has its own local duration picker (a `<select>` with fixed options 0.5 s / 1 s / 2 s / 4 s) that is completely independent of the duration slider added in Task 13. The exported file should always match exactly what the user hears when pressing Play.
+**Status:** Done
+
+> **Depends on Task 13** — `params.duration` must exist before implementing this task.
+
+### Current Behaviour
+
+`ExportPanel.svelte` declares `let duration = $state(1)` and passes it to `renderToBuffer(params, duration)`. The user can set the play duration to e.g. 300 ms in the main UI but the export silently uses a different 1 s duration.
+
+### Steps
+
+1. **`src/lib/components/ExportPanel.svelte`**
+
+   a. Remove the local duration state variable:
+   ```ts
+   // Delete this line:
+   let duration = $state(1);
+   ```
+
+   b. Remove the Duration `<label>` and `<select>` block from the template:
+   ```svelte
+   <!-- Delete this entire block: -->
+   <label>
+     Duration
+     <select bind:value={duration}>
+       <option value={0.5}>0.5s</option>
+       <option value={1}>1s</option>
+       <option value={2}>2s</option>
+       <option value={4}>4s</option>
+     </select>
+   </label>
+   ```
+
+   c. In `handleExport()`, replace the `duration` reference with `params.duration / 1000` (the slider stores milliseconds, `renderToBuffer` expects seconds):
+   ```ts
+   // Before:
+   const buffer = await renderToBuffer(params, duration);
+   // After:
+   const buffer = await renderToBuffer(params, params.duration / 1000);
+   ```
+
+   d. The `.controls` grid currently uses `grid-template-columns: repeat(2, minmax(0, 1fr))` to lay out two controls side by side. With Duration removed there is only the Format selector left — change it to a single column:
+   ```css
+   .controls {
+     grid-template-columns: 1fr;
+   }
+   ```
+
+### Unit Tests
+
+- **`exporter.test.ts`**: `renderToBuffer` mock receives `params.duration / 1000` as the duration argument, not a hardcoded value
+- Manual: set Duration slider to 200 ms → click EXPORT WAV → imported into DAW or played via `<audio>` element should be ~200 ms long
+
+---
+
+## Task 18 — Larger PixelToggle Hit Targets
+
+**Goal:** The waveform and arpeggio toggle buttons are hard to click/tap because their hit area is too small. Increase button size to be at least 2× taller and 4× wider than the current size.
+
+### Current Dimensions
+
+In `src/lib/components/PixelToggle.svelte` the button style is:
+```css
+button {
+  padding: 0.5rem 0.65rem;   /* 0.5rem vertical, 0.65rem horizontal */
+  font-size: 0.6rem;
+}
+```
+Approximate rendered size per button: ~28 px tall × ~40–50 px wide (depending on label length).
+
+### Steps
+
+1. **`src/lib/components/PixelToggle.svelte`** — update the `button` CSS rule:
+   ```css
+   button {
+     border: 2px solid var(--accent, #00e5ff);
+     background: transparent;
+     color: inherit;
+     padding: 1rem 2.5rem;    /* 2× vertical (was 0.5rem), ~4× horizontal (was 0.65rem) */
+     font: inherit;
+     font-size: 0.6rem;
+     min-width: 4rem;          /* ensure short labels like "Up" / "Dn" get the same width */
+   }
+   ```
+
+   `min-width: 4rem` prevents short labels from being narrower than longer ones, giving the button group a consistent look when labels have varying character counts.
+
+2. No changes needed to `PixelToggle`'s script or template.
+
+### Unit Tests
+
+- **`PixelToggle.test.ts`**: No new logic — verify existing tests still pass
+- Manual: tap each waveform button on a mobile-sized viewport; confirm the target is comfortably tappable
+
+---
+
+## Task 19 — More Distinctive Section Headings
+
+**Goal:** Section titles (OSCILLATOR, ENVELOPE, EFFECTS, etc.) currently render as plain text inside a `<header>` element at `0.68 rem`. Wrap each title in an `<h2>` element and increase the font size to `1.2 rem` so section breaks are visually distinct from the slider labels inside them.
+
+### Affected Files
+
+- `src/lib/components/SectionCard.svelte` — desktop layout heading
+- `src/lib/components/ResponsiveSection.svelte` — mobile `<summary>` heading
+
+### Steps
+
+1. **`src/lib/components/SectionCard.svelte`**
+
+   a. Wrap the title text in an `<h2>` inside `<header>`:
+   ```svelte
+   <!-- Before: -->
+   <header>{title}</header>
+
+   <!-- After: -->
+   <header><h2>{title}</h2></header>
+   ```
+
+   b. Update the CSS — remove `font-size` from `header` (it now only acts as a flex/grid container) and add an `h2` rule:
+   ```css
+   header {
+     margin-bottom: 0.7rem;    /* keep existing spacing */
+   }
+
+   h2 {
+     margin: 0;
+     font-size: 1.2rem;
+     font: inherit;            /* preserve Press Start 2P */
+     font-size: 1.2rem;        /* override the inherited size */
+   }
+   ```
+   > Note: `font: inherit` resets all font sub-properties (including `font-size`) to the inherited body value, so `font-size: 1.2rem` must be declared **after** `font: inherit` in the same rule, not before.
+
+2. **`src/lib/components/ResponsiveSection.svelte`**
+
+   a. Wrap the summary text in an `<h2>`:
+   ```svelte
+   <!-- Before: -->
+   <summary>{title}</summary>
+
+   <!-- After: -->
+   <summary><h2>{title}</h2></summary>
+   ```
+
+   b. Update the CSS — the `<summary>` padding stays the same; move the font-size to the `h2`:
+   ```css
+   .mobile-accordion summary {
+     cursor: pointer;
+     list-style: none;
+     padding: 0.75rem;
+     user-select: none;
+   }
+
+   .mobile-accordion summary h2 {
+     margin: 0;
+     font: inherit;
+     font-size: 1.2rem;
+     display: inline;    /* keeps summary layout unchanged */
+   }
+   ```
+
+### Unit Tests
+
+- No logic change — verify with `npm run check` (TypeScript + Svelte type checking) that no type errors are introduced
+- Manual: inspect rendered HTML in DevTools to confirm `<header><h2>OSCILLATOR</h2></header>` structure
+
+---
