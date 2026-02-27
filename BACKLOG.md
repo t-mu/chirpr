@@ -938,6 +938,7 @@ Approximate rendered size per button: ~28 px tall × ~40–50 px wide (depending
 ## Task 19 — More Distinctive Section Headings
 
 **Goal:** Section titles (OSCILLATOR, ENVELOPE, EFFECTS, etc.) currently render as plain text inside a `<header>` element at `0.68 rem`. Wrap each title in an `<h2>` element and increase the font size to `1.2 rem` so section breaks are visually distinct from the slider labels inside them.
+**Status:** Done
 
 ### Affected Files
 

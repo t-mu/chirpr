@@ -18,7 +18,7 @@
 </div>
 
 <details class="mobile-accordion" {open}>
-	<summary>{title}</summary>
+	<summary><h2>{title}</h2></summary>
 	<div class="mobile-accordion__body">
 		{@render children?.()}
 	</div>
@@ -36,8 +36,14 @@
 		cursor: pointer;
 		list-style: none;
 		padding: 0.75rem;
-		font-size: 0.68rem;
 		user-select: none;
+	}
+
+	.mobile-accordion summary h2 {
+		margin: 0;
+		font: inherit;
+		font-size: 1.2rem;
+		display: inline;
 	}
 
 	.mobile-accordion summary::-webkit-details-marker {

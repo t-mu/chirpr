@@ -10,7 +10,7 @@
 </script>
 
 <section class="section-card">
-	<header>{title}</header>
+	<header><h2>{title}</h2></header>
 	<div class="section-card__body">
 		{@render children?.()}
 	</div>
@@ -25,8 +25,13 @@
 	}
 
 	header {
-		font-size: 0.68rem;
 		margin-bottom: 0.7rem;
+	}
+
+	h2 {
+		margin: 0;
+		font: inherit;
+		font-size: 1.2rem;
 	}
 
 	.section-card__body {
