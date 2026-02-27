@@ -19,7 +19,8 @@
 
 	let synthesizer = $state<SynthesizerAPI | null>(null);
 	let isPlaying = $state(false);
-	let isBooting = $state(true);
+	let audioReady = $state(false);
+	let audioInitAttempted = $state(false);
 	let lastRandomCategory = $state<SoundCategory>('shoot');
 	let playTimeout = $state<number | null>(null);
 	let previewDebounce = $state<number | null>(null);
@@ -160,15 +161,16 @@
 
 	onMount(() => {
 		window.addEventListener('keydown', onKeydown);
-		void (async () => {
-			try {
-				await initAudio();
-			} catch {
+		void initAudio()
+			.then(() => {
+				audioReady = true;
+			})
+			.catch(() => {
 				// Browsers can reject startup without user interaction.
-			} finally {
-				isBooting = false;
-			}
-		})();
+			})
+			.finally(() => {
+				audioInitAttempted = true;
+			});
 		return () => {
 			window.removeEventListener('keydown', onKeydown);
 			clearPlayTimeout();
@@ -179,218 +181,197 @@
 </script>
 
 <svelte:head>
-	<title>SFX MAKER</title>
+	<title>Chirpr</title>
 </svelte:head>
 
-{#if isBooting}
-	<div class="boot-screen">
-		<p>LOADING AUDIO ENGINE...</p>
-	</div>
-{:else}
-	<div class="dashboard">
-		<header class="header-bar">
-			<div>
-				<h1>SFX MAKER</h1>
-				<p>v0.1.0</p>
-			</div>
-			<a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a>
-		</header>
+<div class="dashboard">
+	<header class="header-bar">
+		<div>
+			<h1>Chirpr</h1>
+			<p>v0.1.0</p>
+		</div>
+		<a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a>
+	</header>
 
-		<div class="layout">
-			<div class="left-column">
-				<ResponsiveSection title="OSCILLATOR" open={true}>
-					<PixelToggle
-						options={waveformOptions}
-						selected={params.waveform}
-						onChange={(value) => void applyParam('waveform', value as WaveformType)}
-					/>
-					<PixelSlider
-						label="Frequency"
-						min={20}
-						max={2000}
-						step={1}
-						value={params.frequency}
-						unit="Hz"
-						onChange={(value) => void applyParam('frequency', value)}
-					/>
-					<PixelSlider
-						label="Detune"
-						min={-100}
-						max={100}
-						step={1}
-						value={params.detune}
-						unit="c"
-						onChange={(value) => void applyParam('detune', value)}
-					/>
-				</ResponsiveSection>
-
-				<ResponsiveSection title="ENVELOPE">
-					<PixelSlider
-						label="Attack"
-						min={0.001}
-						max={2}
-						step={0.001}
-						value={params.attack}
-						onChange={(value) => void applyParam('attack', value)}
-					/>
-					<PixelSlider
-						label="Decay"
-						min={0.001}
-						max={2}
-						step={0.001}
-						value={params.decay}
-						onChange={(value) => void applyParam('decay', value)}
-					/>
-					<PixelSlider
-						label="Sustain"
-						min={0}
-						max={1}
-						step={0.01}
-						value={params.sustain}
-						onChange={(value) => void applyParam('sustain', value)}
-					/>
-					<PixelSlider
-						label="Release"
-						min={0.001}
-						max={5}
-						step={0.001}
-						value={params.release}
-						onChange={(value) => void applyParam('release', value)}
-					/>
-				</ResponsiveSection>
-
-				{#if params.waveform === 'square'}
-					<ResponsiveSection title="DUTY CYCLE">
-						<PixelSlider
-							label="Width"
-							min={0}
-							max={1}
-							step={0.01}
-							value={params.dutyCycle}
-							onChange={(value) => void applyParam('dutyCycle', value)}
-						/>
-					</ResponsiveSection>
-				{/if}
-
-				<ResponsiveSection title="EFFECTS">
-					<PixelSlider
-						label="Vibrato Rate"
-						min={0}
-						max={20}
-						step={0.1}
-						value={params.vibratoRate}
-						unit="Hz"
-						onChange={(value) => void applyParam('vibratoRate', value)}
-					/>
-					<PixelSlider
-						label="Vibrato Depth"
-						min={0}
-						max={1}
-						step={0.01}
-						value={params.vibratoDepth}
-						onChange={(value) => void applyParam('vibratoDepth', value)}
-					/>
-					<PixelSlider
-						label="Arp Speed"
-						min={0}
-						max={20}
-						step={0.1}
-						value={params.arpSpeed}
-						unit="Hz"
-						onChange={(value) => void applyParam('arpSpeed', value)}
-					/>
-					<PixelSlider
-						label="Flanger Rate"
-						min={0}
-						max={20}
-						step={0.1}
-						value={params.flangerRate}
-						unit="Hz"
-						onChange={(value) => void applyParam('flangerRate', value)}
-					/>
-					<PixelSlider
-						label="LPF Cutoff"
-						min={20}
-						max={20000}
-						step={1}
-						value={params.lpfCutoff}
-						unit="Hz"
-						onChange={(value) => void applyParam('lpfCutoff', value)}
-					/>
-					<PixelSlider
-						label="HPF Cutoff"
-						min={20}
-						max={20000}
-						step={1}
-						value={params.hpfCutoff}
-						unit="Hz"
-						onChange={(value) => void applyParam('hpfCutoff', value)}
-					/>
-					<PixelSlider
-						label="Bit Depth"
-						min={1}
-						max={16}
-						step={1}
-						value={params.bitDepth}
-						onChange={(value) => void applyParam('bitDepth', value)}
-					/>
-					<PixelSlider
-						label="Retrigger"
-						min={0}
-						max={20}
-						step={0.1}
-						value={params.retriggerRate}
-						onChange={(value) => void applyParam('retriggerRate', value)}
-					/>
-				</ResponsiveSection>
-			</div>
-
-			<div class="right-column">
-				<ResponsiveSection title="OSCILLOSCOPE" open={true}>
-					<Oscilloscope waveform={waveformSource} />
-				</ResponsiveSection>
-
-				<PixelSlider
-					label="Duration"
-					min={50}
-					max={2000}
-					step={10}
-					value={params.duration}
-					unit="ms"
-					onChange={(value) => void applyParam('duration', value)}
+	<div class="layout">
+		<div class="left-column">
+			<ResponsiveSection title="OSCILLATOR" open={true}>
+				<PixelToggle
+					options={waveformOptions}
+					selected={params.waveform}
+					onChange={(value) => void applyParam('waveform', value as WaveformType)}
 				/>
+				<PixelSlider
+					label="Frequency"
+					min={20}
+					max={2000}
+					step={1}
+					value={params.frequency}
+					unit="Hz"
+					onChange={(value) => void applyParam('frequency', value)}
+				/>
+				<PixelSlider
+					label="Detune"
+					min={-100}
+					max={100}
+					step={1}
+					value={params.detune}
+					unit="c"
+					onChange={(value) => void applyParam('detune', value)}
+				/>
+			</ResponsiveSection>
 
-				<button class="play-button" type="button" onclick={() => void togglePlay()}>
-					{isPlaying ? '■ STOP' : '▶ PLAY'}
-				</button>
+			<ResponsiveSection title="ENVELOPE">
+				<PixelSlider
+					label="Attack"
+					min={0.001}
+					max={2}
+					step={0.001}
+					value={params.attack}
+					onChange={(value) => void applyParam('attack', value)}
+				/>
+				<PixelSlider
+					label="Decay"
+					min={0.001}
+					max={2}
+					step={0.001}
+					value={params.decay}
+					onChange={(value) => void applyParam('decay', value)}
+				/>
+				<PixelSlider
+					label="Sustain"
+					min={0}
+					max={1}
+					step={0.01}
+					value={params.sustain}
+					onChange={(value) => void applyParam('sustain', value)}
+				/>
+				<PixelSlider
+					label="Release"
+					min={0.001}
+					max={5}
+					step={0.001}
+					value={params.release}
+					onChange={(value) => void applyParam('release', value)}
+				/>
+			</ResponsiveSection>
 
-				<PresetPanel {synthesizer} />
-				<RandomizerPanel onRandomize={(category) => void applyRandomCategory(category)} />
-				<ExportPanel />
-			</div>
+			{#if params.waveform === 'square'}
+				<ResponsiveSection title="DUTY CYCLE">
+					<PixelSlider
+						label="Width"
+						min={0}
+						max={1}
+						step={0.01}
+						value={params.dutyCycle}
+						onChange={(value) => void applyParam('dutyCycle', value)}
+					/>
+				</ResponsiveSection>
+			{/if}
+
+			<ResponsiveSection title="EFFECTS">
+				<PixelSlider
+					label="Vibrato Rate"
+					min={0}
+					max={20}
+					step={0.1}
+					value={params.vibratoRate}
+					unit="Hz"
+					onChange={(value) => void applyParam('vibratoRate', value)}
+				/>
+				<PixelSlider
+					label="Vibrato Depth"
+					min={0}
+					max={1}
+					step={0.01}
+					value={params.vibratoDepth}
+					onChange={(value) => void applyParam('vibratoDepth', value)}
+				/>
+				<PixelSlider
+					label="Arp Speed"
+					min={0}
+					max={20}
+					step={0.1}
+					value={params.arpSpeed}
+					unit="Hz"
+					onChange={(value) => void applyParam('arpSpeed', value)}
+				/>
+				<PixelSlider
+					label="Flanger Rate"
+					min={0}
+					max={20}
+					step={0.1}
+					value={params.flangerRate}
+					unit="Hz"
+					onChange={(value) => void applyParam('flangerRate', value)}
+				/>
+				<PixelSlider
+					label="LPF Cutoff"
+					min={20}
+					max={20000}
+					step={1}
+					value={params.lpfCutoff}
+					unit="Hz"
+					onChange={(value) => void applyParam('lpfCutoff', value)}
+				/>
+				<PixelSlider
+					label="HPF Cutoff"
+					min={20}
+					max={20000}
+					step={1}
+					value={params.hpfCutoff}
+					unit="Hz"
+					onChange={(value) => void applyParam('hpfCutoff', value)}
+				/>
+				<PixelSlider
+					label="Bit Depth"
+					min={1}
+					max={16}
+					step={1}
+					value={params.bitDepth}
+					onChange={(value) => void applyParam('bitDepth', value)}
+				/>
+				<PixelSlider
+					label="Retrigger"
+					min={0}
+					max={20}
+					step={0.1}
+					value={params.retriggerRate}
+					onChange={(value) => void applyParam('retriggerRate', value)}
+				/>
+			</ResponsiveSection>
+		</div>
+
+		<div class="right-column">
+			<ResponsiveSection title="OSCILLOSCOPE" open={true}>
+				<Oscilloscope waveform={waveformSource} />
+			</ResponsiveSection>
+
+			<PixelSlider
+				label="Duration"
+				min={50}
+				max={2000}
+				step={10}
+				value={params.duration}
+				unit="ms"
+				onChange={(value) => void applyParam('duration', value)}
+			/>
+
+			<button class="play-button" type="button" onclick={() => void togglePlay()}>
+				{isPlaying ? '■ STOP' : '▶ PLAY'}
+			</button>
+			{#if !audioReady && audioInitAttempted}
+				<p class="audio-hint">AUDIO ENABLES ON FIRST INTERACTION</p>
+			{/if}
+
+			<PresetPanel {synthesizer} />
+			<RandomizerPanel onRandomize={(category) => void applyRandomCategory(category)} />
+			<ExportPanel />
 		</div>
 	</div>
-{/if}
+</div>
 
 <style>
-	.boot-screen {
-		min-height: 100vh;
-		display: grid;
-		place-items: center;
-		padding: 1rem;
-		text-align: center;
-	}
-
-	.boot-screen p {
-		margin: 0;
-		padding: 1rem;
-		border: 2px solid var(--accent);
-		background: var(--surface);
-		box-shadow: 4px 4px 0 #000;
-		font-size: clamp(0.6rem, 2vw, 0.8rem);
-		color: var(--yellow);
-	}
-
 	.dashboard {
 		display: grid;
 		gap: 1rem;
@@ -444,6 +425,12 @@
 		padding: 0.9rem;
 		font-size: 0.75rem;
 		box-shadow: 4px 4px 0 #000;
+	}
+
+	.audio-hint {
+		margin: -0.3rem 0 0;
+		font-size: 0.52rem;
+		color: var(--yellow);
 	}
 
 	@media (max-width: 900px) {

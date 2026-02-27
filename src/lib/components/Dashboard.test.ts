@@ -57,9 +57,9 @@ afterEach(() => {
 });
 
 describe('Dashboard', () => {
-	it('renders play button after boot loading state', async () => {
-		const { findByRole } = render(Dashboard);
-		expect(await findByRole('button', { name: '▶ PLAY' })).toBeTruthy();
+	it('renders play button immediately', () => {
+		const { getByRole } = render(Dashboard);
+		expect(getByRole('button', { name: '▶ PLAY' })).toBeTruthy();
 	});
 
 	it('space toggles play and ignores input-focused shortcuts', async () => {

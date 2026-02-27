@@ -303,7 +303,7 @@ Install `jest-canvas-mock` (or `vitest-canvas-mock`) and import it in the Vitest
    - Click → `Tone.start()` must be the **first** call inside the handler with no preceding `await` — yielding before `Tone.start()` breaks the gesture chain in Safari iOS and leaves the AudioContext suspended → then `await synthesizer.init()` (first time only) → `synthesizer.play()`
    - Space bar shortcut → same behavior, but **guard against focus inside form inputs**: `if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return`
    - Visual: large pixel-art button, changes label to "■ STOP" while playing
-7. Add a header bar: app title "SFX MAKER" in large Press Start 2P, version, GitHub link
+7. Add a header bar: app title "Chirpr" in large Press Start 2P, version, GitHub link
 8. Mount `Dashboard` in `src/routes/+page.svelte`
 
 ### Unit Tests
@@ -461,7 +461,7 @@ Mock `OfflineAudioContext` and the BitCrusher worklet registration — jsdom doe
    - `S` → Focus the preset name input (ready to save) — do **not** use `Ctrl+S`; browsers may show "Save Page As" regardless of `preventDefault()`
    - `Escape` → Reset params to defaults — do **not** use `Ctrl+Z`; it conflicts with the browser's native undo in text inputs and cannot be reliably intercepted on all platforms
 7. **Responsive layout** — at < 900px, collapse to single column with sections in accordions
-8. **Page title + favicon** — set `<title>SFX MAKER</title>` and a pixel art favicon (16×16 SVG)
+8. **Page title + favicon** — set `<title>Chirpr</title>` and a pixel art favicon (16×16 SVG)
 9. **Loading state** — show a pixel art boot screen ("LOADING AUDIO ENGINE...") before `initAudio()` resolves
 
 ### Unit Tests
