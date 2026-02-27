@@ -1,13 +1,11 @@
 <script lang="ts">
-	import type { SynthesizerAPI } from '$lib/audio/synthesizer';
-	import { randomize, type SoundCategory } from '$lib/audio/randomizer';
-	import { setParams } from '$lib/stores/synthParams.svelte';
+	import type { SoundCategory } from '$lib/audio/randomizer';
 
 	interface Props {
-		synthesizer?: SynthesizerAPI | null;
+		onRandomize?: (category: SoundCategory) => void;
 	}
 
-	let { synthesizer = null }: Props = $props();
+	let { onRandomize }: Props = $props();
 	const categories: SoundCategory[] = [
 		'shoot',
 		'jump',
@@ -19,11 +17,7 @@
 	];
 
 	function randomizeCategory(category: SoundCategory): void {
-		const next = randomize(category);
-		setParams(next);
-		synthesizer?.updateParams(next);
-		synthesizer?.play('C4');
-		setTimeout(() => synthesizer?.stop(), 220);
+		onRandomize?.(category);
 	}
 </script>
 

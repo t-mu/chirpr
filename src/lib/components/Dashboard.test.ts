@@ -1,19 +1,33 @@
-import { fireEvent, render } from '@testing-library/svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, waitFor } from '@testing-library/svelte';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard.svelte';
+import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
+import { params, resetParams, updateParam } from '$lib/stores/synthParams.svelte';
 
-const mockPlay = vi.fn();
-const mockStop = vi.fn();
-const mockUpdateParams = vi.fn();
-const mockDispose = vi.fn();
+const { mockPlay, mockStop, mockUpdateParams, mockDispose, mockRandomize, mockInitAudio } =
+	vi.hoisted(() => ({
+		mockPlay: vi.fn(),
+		mockStop: vi.fn(),
+		mockUpdateParams: vi.fn(),
+		mockDispose: vi.fn(),
+		mockRandomize: vi.fn(),
+		mockInitAudio: vi.fn(async () => {})
+	}));
 
 vi.mock('tone', () => ({
-	start: vi.fn(async () => {}),
 	Waveform: class {
 		public getValue() {
 			return new Float32Array(1024);
 		}
 	}
+}));
+
+vi.mock('$lib/audio/engine', () => ({
+	initAudio: mockInitAudio
+}));
+
+vi.mock('$lib/audio/randomizer', () => ({
+	randomize: mockRandomize
 }));
 
 vi.mock('$lib/audio/synthesizer', () => ({
@@ -26,26 +40,73 @@ vi.mock('$lib/audio/synthesizer', () => ({
 	}))
 }));
 
+beforeEach(() => {
+	resetParams();
+	mockRandomize.mockImplementation(() => ({ ...DEFAULT_PARAMS, frequency: 777 }));
+});
+
 afterEach(() => {
 	document.body.innerHTML = '';
+	resetParams();
 	mockPlay.mockClear();
 	mockStop.mockClear();
 	mockUpdateParams.mockClear();
 	mockDispose.mockClear();
+	mockRandomize.mockClear();
+	mockInitAudio.mockClear();
 });
 
 describe('Dashboard', () => {
-	it('renders play button', () => {
-		const { getByRole } = render(Dashboard);
-		expect(getByRole('button', { name: '▶ PLAY' })).toBeTruthy();
+	it('renders play button after boot loading state', async () => {
+		const { findByRole } = render(Dashboard);
+		expect(await findByRole('button', { name: '▶ PLAY' })).toBeTruthy();
 	});
 
-	it('clicking play does not throw', async () => {
-		const { getByRole } = render(Dashboard);
-		const playButton = getByRole('button', { name: '▶ PLAY' });
+	it('space toggles play and ignores input-focused shortcuts', async () => {
+		const { findByRole, getByLabelText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
 
-		await expect(async () => {
-			await fireEvent.click(playButton);
-		}).not.toThrow();
+		window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalled();
+		});
+		const playCalls = mockPlay.mock.calls.length;
+
+		const presetInput = getByLabelText('Preset name');
+		await fireEvent.keyDown(presetInput, { key: ' ', code: 'Space' });
+		expect(mockPlay).toHaveBeenCalledTimes(playCalls);
+		expect(await findByRole('button', { name: '■ STOP' })).toBeTruthy();
+	});
+
+	it('R rerolls last random category and previews sound', async () => {
+		const { findByRole } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		await fireEvent.keyDown(window, { code: 'KeyR' });
+
+		expect(mockRandomize).toHaveBeenCalledWith('shoot');
+		expect(mockUpdateParams).toHaveBeenCalledWith(expect.objectContaining({ frequency: 777 }));
+		expect(mockPlay).toHaveBeenCalled();
+	});
+
+	it('S focuses preset name input', async () => {
+		const { findByRole, getByLabelText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		const presetInput = getByLabelText('Preset name') as HTMLInputElement;
+
+		await fireEvent.keyDown(window, { code: 'KeyS' });
+
+		expect(document.activeElement).toBe(presetInput);
+	});
+
+	it('Escape resets params and syncs defaults to synthesizer', async () => {
+		const { findByRole } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		updateParam('frequency', 1500);
+		expect(params.frequency).toBe(1500);
+
+		await fireEvent.keyDown(window, { code: 'Escape' });
+
+		expect(params.frequency).toBe(DEFAULT_PARAMS.frequency);
+		expect(mockUpdateParams).toHaveBeenCalledWith(DEFAULT_PARAMS);
 	});
 });

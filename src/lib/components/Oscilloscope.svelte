@@ -49,14 +49,35 @@
 	});
 </script>
 
-<canvas bind:this={canvas} width="640" height="220" class="oscilloscope"></canvas>
+<div class="oscilloscope-wrap">
+	<canvas bind:this={canvas} width="640" height="220" class="oscilloscope"></canvas>
+</div>
 
 <style>
+	.oscilloscope-wrap {
+		position: relative;
+	}
+
+	.oscilloscope-wrap::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: repeating-linear-gradient(
+			to bottom,
+			rgba(255, 255, 255, 0.04) 0,
+			rgba(255, 255, 255, 0.04) 1px,
+			transparent 1px,
+			transparent 4px
+		);
+	}
+
 	.oscilloscope {
 		width: 100%;
 		height: auto;
 		display: block;
 		image-rendering: pixelated;
 		border: 2px solid var(--accent, #00e5ff);
+		box-shadow: 4px 4px 0 #000;
 	}
 </style>

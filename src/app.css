@@ -21,6 +21,24 @@ body {
 	font-family: 'Press Start 2P', monospace;
 }
 
+button,
+input,
+select {
+	box-shadow: 4px 4px 0 #000;
+}
+
+button {
+	cursor: pointer;
+	transition:
+		transform 80ms steps(2, end),
+		box-shadow 80ms steps(2, end);
+}
+
+button:active {
+	transform: translateY(2px);
+	box-shadow: 2px 2px 0 #000;
+}
+
 ::selection {
 	background: var(--accent);
 	color: #000;
