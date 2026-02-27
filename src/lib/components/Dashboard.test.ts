@@ -227,4 +227,27 @@ describe('Dashboard', () => {
 			expect(mockStopPreview).toHaveBeenCalledTimes(1);
 		});
 	});
+
+	it('skips held preview and uses one-shot preview when arp mode is enabled', async () => {
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		const arpInput = getByText('Arp Speed').closest('label')?.querySelector('input');
+		expect(arpInput).toBeTruthy();
+		await fireEvent.input(arpInput as HTMLInputElement, { target: { value: '6' } });
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+		mockPlay.mockClear();
+
+		const frequencyInput = getByText('Frequency').closest('label')?.querySelector('input');
+		expect(frequencyInput).toBeTruthy();
+		await fireEvent.pointerDown(frequencyInput as HTMLInputElement);
+		expect(mockStartPreview).not.toHaveBeenCalled();
+
+		await fireEvent.input(frequencyInput as HTMLInputElement, { target: { value: '880' } });
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+	});
 });

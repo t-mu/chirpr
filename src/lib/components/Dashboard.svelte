@@ -40,6 +40,12 @@
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
 
+	function isSequencedPreviewMode(): boolean {
+		const isArp = params.arpSpeed > 0;
+		const isRetrigger = params.retriggerRate > 0 && params.retriggerCount > 0;
+		return isArp || isRetrigger;
+	}
+
 	async function applyParam<K extends keyof SynthParams>(
 		key: K,
 		value: SynthParams[K]
@@ -104,6 +110,7 @@
 		ensureSynth,
 		initAudio,
 		isPlaying: () => isPlaying,
+		isSequencedPreviewMode,
 		previewOneShot: previewSound
 	});
 

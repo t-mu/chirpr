@@ -16,6 +16,7 @@ interface PreviewControllerDeps {
 	ensureSynth: () => Promise<SynthesizerAPI>;
 	initAudio: () => Promise<void>;
 	isPlaying: () => boolean;
+	isSequencedPreviewMode: () => boolean;
 	previewOneShot: (synth: SynthesizerAPI) => void;
 }
 
@@ -52,6 +53,7 @@ export function createDashboardPreviewController(deps: PreviewControllerDeps) {
 		activeDragCount += 1;
 		clearHeldPreviewRelease();
 		clearPreviewDebounce();
+		if (deps.isSequencedPreviewMode()) return;
 		if (isHeldPreviewActive || activeDragCount !== 1) return;
 
 		await deps.initAudio();
