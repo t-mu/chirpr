@@ -155,9 +155,21 @@ describe('Dashboard', () => {
 		await findByRole('button', { name: '▶ PLAY' });
 		const sawButton = await findByRole('button', { name: 'Saw' });
 
-		expect(queryByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.')).toBeNull();
+		expect(queryByText('WIDTH IS AVAILABLE ONLY FOR SQUARE WAVEFORM.')).toBeNull();
 		await fireEvent.click(sawButton);
-		expect(queryAllByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.').length).toBe(1);
+		expect(queryAllByText('WIDTH IS AVAILABLE ONLY FOR SQUARE WAVEFORM.').length).toBe(1);
+	});
+
+	it('renders split effects sections and hides legacy section titles', async () => {
+		const { findByRole, getByText, queryByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		expect(getByText('FILTERS')).toBeTruthy();
+		expect(getByText('MODULATION')).toBeTruthy();
+		expect(getByText('FLANGER')).toBeTruthy();
+		expect(getByText('BIT CRUSHER')).toBeTruthy();
+		expect(queryByText('EFFECTS')).toBeNull();
+		expect(queryByText('DUTY CYCLE')).toBeNull();
 	});
 
 	it('shows retrigger slider', async () => {
@@ -170,14 +182,15 @@ describe('Dashboard', () => {
 		const { findByRole, getByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });
 
-		expect(getByText('Flanger Depth')).toBeTruthy();
-		expect(getByText('Flanger Feedback')).toBeTruthy();
-		expect(getByText('Flanger Mix')).toBeTruthy();
+		expect(getByText('Feedback')).toBeTruthy();
+		expect(getByText('Mix')).toBeTruthy();
 		expect(getByText('Bit Depth')).toBeTruthy();
-		expect(getByText('Sample Rate Reduction')).toBeTruthy();
+		expect(getByText('Sample Rate')).toBeTruthy();
+		expect(getByText('LPF Resonance')).toBeTruthy();
+		expect(getByText('HPF Resonance')).toBeTruthy();
 	});
 
-	it('updates flanger depth parameter when slider changes', async () => {
+	it('updates flanger feedback parameter when slider changes', async () => {
 		const { findByRole, getByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });
 		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
@@ -185,12 +198,12 @@ describe('Dashboard', () => {
 			expect(mockPlay).toHaveBeenCalledTimes(1);
 		});
 
-		const input = getByText('Flanger Depth').closest('label')?.querySelector('input');
+		const input = getByText('Feedback').closest('label')?.querySelector('input');
 		expect(input).toBeTruthy();
 
 		await fireEvent.input(input as HTMLInputElement, { target: { value: '0.42' } });
 
-		expect(mockUpdateParams).toHaveBeenCalledWith({ flangerDepth: 0.42 });
+		expect(mockUpdateParams).toHaveBeenCalledWith({ flangerFeedback: 0.42 });
 	});
 
 	it('updates sample rate reduction when slider changes', async () => {
@@ -201,7 +214,7 @@ describe('Dashboard', () => {
 			expect(mockPlay).toHaveBeenCalledTimes(1);
 		});
 
-		const input = getByText('Sample Rate Reduction').closest('label')?.querySelector('input');
+		const input = getByText('Sample Rate').closest('label')?.querySelector('input');
 		expect(input).toBeTruthy();
 
 		await fireEvent.input(input as HTMLInputElement, { target: { value: '12' } });

@@ -14,10 +14,12 @@
 	import ExportPanel from '$lib/components/ExportPanel.svelte';
 	import { APP_REPOSITORY_URL } from '$lib/config/app';
 	import {
+		BIT_CRUSHER_SLIDERS,
 		DUTY_CYCLE_DISABLED_NOTE,
-		DUTY_CYCLE_SLIDERS,
-		EFFECTS_SLIDERS,
 		ENVELOPE_SLIDERS,
+		FILTERS_SLIDERS,
+		FLANGER_SLIDERS,
+		MODULATION_SLIDERS,
 		OSCILLATOR_SLIDERS,
 		PLAYBACK_SLIDERS
 	} from '$lib/components/dashboardConfig';
@@ -241,11 +243,15 @@
 						paramKey={slider.key}
 						label={slider.label}
 						value={params[slider.key]}
+						disabled={slider.disabledWhen?.(params) ?? false}
 						onChange={(value) => onSliderValueChange(slider.key, value)}
 						onDragStart={onSliderDragStart}
 						onDragEnd={onSliderDragEnd}
 					/>
 				{/each}
+				{#if params.waveform !== 'square'}
+					<p class="section-note">{DUTY_CYCLE_DISABLED_NOTE}</p>
+				{/if}
 			</ResponsiveSection>
 
 			<ResponsiveSection title="ENVELOPE">
@@ -261,30 +267,51 @@
 				{/each}
 			</ResponsiveSection>
 
-			<ResponsiveSection title="DUTY CYCLE">
-				{#each DUTY_CYCLE_SLIDERS as slider (slider.key)}
+			<ResponsiveSection title="FILTERS">
+				{#each FILTERS_SLIDERS as slider (slider.key)}
 					<ParamSlider
 						paramKey={slider.key}
 						label={slider.label}
 						value={params[slider.key]}
-						disabled={slider.disabledWhen?.(params) ?? false}
 						onChange={(value) => onSliderValueChange(slider.key, value)}
 						onDragStart={onSliderDragStart}
 						onDragEnd={onSliderDragEnd}
 					/>
 				{/each}
-				{#if params.waveform !== 'square'}
-					<p class="section-note">{DUTY_CYCLE_DISABLED_NOTE}</p>
-				{/if}
 			</ResponsiveSection>
 
-			<ResponsiveSection title="EFFECTS">
-				{#each EFFECTS_SLIDERS as slider (slider.key)}
+			<ResponsiveSection title="MODULATION">
+				{#each MODULATION_SLIDERS as slider (slider.key)}
 					<ParamSlider
 						paramKey={slider.key}
 						label={slider.label}
 						value={params[slider.key]}
-						disabled={slider.disabledWhen?.(params) ?? false}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
+			</ResponsiveSection>
+
+			<ResponsiveSection title="FLANGER">
+				{#each FLANGER_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
+			</ResponsiveSection>
+
+			<ResponsiveSection title="BIT CRUSHER">
+				{#each BIT_CRUSHER_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
 						onChange={(value) => onSliderValueChange(slider.key, value)}
 						onDragStart={onSliderDragStart}
 						onDragEnd={onSliderDragEnd}
