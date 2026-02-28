@@ -1749,7 +1749,7 @@ test('calls onChange when a control point is dragged', async () => {
 
 ---
 
-## Task 26 — Synthesizer & Exporter Automation Scheduling
+## ~~Task 26 — Synthesizer & Exporter Automation Scheduling~~ ✅ DONE
 
 **Goal:** Wire bezier curves into actual audio. When `play()` is called and a param has an active curve, schedule `setValueCurveAtTime` on the corresponding AudioParam so the value glides according to the curve over the note duration. Curves do not apply during arpeggio/retrigger modes or preview holds.
 

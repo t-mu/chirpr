@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
 import { BitCrusherNode } from './BitCrusherNode';
+import { sampleCurve } from './bezier';
 import {
 	type ArpPattern,
 	type SynthParams,
@@ -120,9 +121,10 @@ class Synthesizer implements SynthesizerAPI {
 
 		if (this.voice instanceof Tone.NoiseSynth) {
 			this.voice.triggerAttackRelease(sec);
-			return;
+		} else {
+			this.voice.triggerAttackRelease(this.currentFrequency, sec);
 		}
-		this.voice.triggerAttackRelease(this.currentFrequency, sec);
+		this.applyCurves(sec);
 	}
 
 	startPreview(note?: string | number): void {
@@ -150,6 +152,7 @@ class Synthesizer implements SynthesizerAPI {
 	}
 
 	stop(): void {
+		this.cancelCurveAutomation();
 		Tone.getTransport().cancel();
 		this.stopPreview();
 		this.voice.triggerRelease();
@@ -283,6 +286,76 @@ class Synthesizer implements SynthesizerAPI {
 		}
 		if (isRetriggerEnabled(params)) {
 			this.arpPattern.stop();
+		}
+		this.restoreStaticParams(params);
+	}
+
+	private applyCurves(durationSec: number): void {
+		const curves = this.params.curves ?? {};
+		const now = Tone.now();
+		const sampleCount = 128;
+		const toCurveValues = (samples: Float32Array): number[] => Array.from(samples);
+
+		if (curves.frequency && this.voice instanceof Tone.Synth) {
+			const samples = toCurveValues(sampleCurve(curves.frequency, sampleCount));
+			this.voice.frequency.cancelScheduledValues(now);
+			this.voice.frequency.setValueCurveAtTime(samples, now, durationSec);
+		}
+		if (curves.lpfCutoff) {
+			const samples = toCurveValues(sampleCurve(curves.lpfCutoff, sampleCount));
+			this.lpf.frequency.cancelScheduledValues(now);
+			this.lpf.frequency.setValueCurveAtTime(samples, now, durationSec);
+		}
+		if (curves.hpfCutoff) {
+			const samples = toCurveValues(sampleCurve(curves.hpfCutoff, sampleCount));
+			this.hpf.frequency.cancelScheduledValues(now);
+			this.hpf.frequency.setValueCurveAtTime(samples, now, durationSec);
+		}
+		if (curves.vibratoDepth) {
+			const samples = toCurveValues(sampleCurve(curves.vibratoDepth, sampleCount));
+			this.vibrato.depth.cancelScheduledValues(now);
+			this.vibrato.depth.setValueCurveAtTime(samples, now, durationSec);
+		}
+		if (curves.vibratoRate) {
+			const samples = toCurveValues(sampleCurve(curves.vibratoRate, sampleCount));
+			this.vibrato.frequency.cancelScheduledValues(now);
+			this.vibrato.frequency.setValueCurveAtTime(samples, now, durationSec);
+		}
+	}
+
+	private cancelCurveAutomation(): void {
+		const now = Tone.now();
+		if (this.voice instanceof Tone.Synth) {
+			this.voice.frequency.cancelScheduledValues(now);
+		}
+		this.lpf.frequency.cancelScheduledValues(now);
+		this.hpf.frequency.cancelScheduledValues(now);
+		this.vibrato.depth.cancelScheduledValues(now);
+		this.vibrato.frequency.cancelScheduledValues(now);
+	}
+
+	private restoreStaticParams(params: SynthParams): void {
+		const curves = params.curves ?? {};
+		const now = Tone.now();
+		if (!curves.frequency && this.voice instanceof Tone.Synth) {
+			this.voice.frequency.cancelScheduledValues(now);
+			this.voice.frequency.value = params.frequency;
+		}
+		if (!curves.lpfCutoff) {
+			this.lpf.frequency.cancelScheduledValues(now);
+			this.lpf.frequency.value = clampParam('lpfCutoff', params.lpfCutoff);
+		}
+		if (!curves.hpfCutoff) {
+			this.hpf.frequency.cancelScheduledValues(now);
+			this.hpf.frequency.value = clampParam('hpfCutoff', params.hpfCutoff);
+		}
+		if (!curves.vibratoDepth) {
+			this.vibrato.depth.cancelScheduledValues(now);
+			this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
+		}
+		if (!curves.vibratoRate) {
+			this.vibrato.frequency.cancelScheduledValues(now);
+			this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
 		}
 	}
 }

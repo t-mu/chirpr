@@ -1,6 +1,7 @@
 import audioBufferToWav from 'audiobuffer-to-wav';
 import { Mp3Encoder } from 'lamejs';
 import bitCrusherUrl from '../../worklets/BitCrusherProcessor.js?url';
+import { sampleCurve } from './bezier';
 import type { SynthParams } from '$lib/types/SynthParams';
 
 const DEFAULT_SAMPLE_RATE = 44100;
@@ -103,6 +104,21 @@ export async function renderToBuffer(
 		oscillator.detune.setValueAtTime(clamp(params.detune, -100, 100), 0);
 		source = oscillator;
 		stopSource = () => oscillator.stop(durationSeconds * 0.8);
+	}
+
+	const curves = params.curves ?? {};
+	const sampleCount = 256;
+	if (curves.frequency && params.waveform !== 'noise') {
+		const samples = sampleCurve(curves.frequency, sampleCount);
+		(source as OscillatorNode).frequency.setValueCurveAtTime(samples, 0, durationSeconds);
+	}
+	if (curves.lpfCutoff) {
+		const samples = sampleCurve(curves.lpfCutoff, sampleCount);
+		lpf.frequency.setValueCurveAtTime(samples, 0, durationSeconds);
+	}
+	if (curves.hpfCutoff) {
+		const samples = sampleCurve(curves.hpfCutoff, sampleCount);
+		hpf.frequency.setValueCurveAtTime(samples, 0, durationSeconds);
 	}
 
 	source.connect(workletNode);

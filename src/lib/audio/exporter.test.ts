@@ -36,6 +36,14 @@ class MockOfflineAudioContext {
 	public readonly sampleRate: number;
 	public readonly length: number;
 	public readonly destination = {} as AudioDestinationNode;
+	public createdFilters: Array<{ frequency: { setValueCurveAtTime: ReturnType<typeof vi.fn> } }> =
+		[];
+	public createdOscillator: {
+		frequency: {
+			setValueAtTime: ReturnType<typeof vi.fn>;
+			setValueCurveAtTime: ReturnType<typeof vi.fn>;
+		};
+	} | null = null;
 	public readonly audioWorklet = {
 		addModule: vi.fn(async () => {})
 	};
@@ -56,12 +64,14 @@ class MockOfflineAudioContext {
 	}
 
 	createBiquadFilter() {
-		return {
+		const node = {
 			type: 'lowpass',
-			frequency: { value: 0 },
+			frequency: { value: 0, setValueCurveAtTime: vi.fn() },
 			Q: { value: 0 },
 			connect: vi.fn()
 		};
+		this.createdFilters.push(node);
+		return node;
 	}
 
 	createBufferSource() {
@@ -75,14 +85,16 @@ class MockOfflineAudioContext {
 	}
 
 	createOscillator() {
-		return {
+		const node = {
 			type: 'sine',
-			frequency: { setValueAtTime: vi.fn() },
+			frequency: { setValueAtTime: vi.fn(), setValueCurveAtTime: vi.fn() },
 			detune: { setValueAtTime: vi.fn() },
 			connect: vi.fn(),
 			start: vi.fn(),
 			stop: vi.fn()
 		};
+		this.createdOscillator = node;
+		return node;
 	}
 
 	createBuffer(_channels: number, length: number, sampleRate: number) {
@@ -128,6 +140,53 @@ describe('exporter', () => {
 	it('renderToBuffer returns expected frame count for duration', async () => {
 		const rendered = await renderToBuffer(DEFAULT_PARAMS, 1);
 		expect(rendered.length).toBe(44100);
+	});
+
+	it('applies frequency/lpf/hpf curves during offline render', async () => {
+		const curveParams = {
+			...DEFAULT_PARAMS,
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 1000 },
+					p1: { x: 0.3, y: 800 },
+					p2: { x: 0.7, y: 400 },
+					p3: { x: 1, y: 200 }
+				},
+				lpfCutoff: {
+					p0: { x: 0, y: 6000 },
+					p1: { x: 0.3, y: 4000 },
+					p2: { x: 0.7, y: 1500 },
+					p3: { x: 1, y: 500 }
+				},
+				hpfCutoff: {
+					p0: { x: 0, y: 20 },
+					p1: { x: 0.3, y: 60 },
+					p2: { x: 0.7, y: 120 },
+					p3: { x: 1, y: 200 }
+				}
+			}
+		};
+		const context = new MockOfflineAudioContext(1, 44100, 44100);
+		vi.stubGlobal(
+			'OfflineAudioContext',
+			class extends MockOfflineAudioContext {
+				constructor(channels: number, length: number, sampleRate: number) {
+					super(channels, length, sampleRate);
+					return context;
+				}
+			}
+		);
+
+		await renderToBuffer(curveParams, 1);
+
+		expect(context.createdOscillator?.frequency.setValueCurveAtTime).toHaveBeenCalledWith(
+			expect.any(Float32Array),
+			0,
+			1
+		);
+		const [lpf, hpf] = context.createdFilters;
+		expect(lpf.frequency.setValueCurveAtTime).toHaveBeenCalledWith(expect.any(Float32Array), 0, 1);
+		expect(hpf.frequency.setValueCurveAtTime).toHaveBeenCalledWith(expect.any(Float32Array), 0, 1);
 	});
 
 	it('downloadBlob creates anchor and triggers click', () => {

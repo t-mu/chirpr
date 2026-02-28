@@ -1,15 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => {
+	const createSignal = (value = 0) => ({
+		value,
+		cancelScheduledValues: vi.fn(),
+		setValueCurveAtTime: vi.fn(),
+		setValueAtTime: vi.fn(),
+		linearRampToValueAtTime: vi.fn()
+	});
 	const synthInstances: Array<{
 		dispose: ReturnType<typeof vi.fn>;
 		widthSetCalls: number;
-		frequency: { value: number };
+		frequency: ReturnType<typeof createSignal>;
 		triggerAttack: ReturnType<typeof vi.fn>;
 		triggerAttackRelease: ReturnType<typeof vi.fn>;
 		triggerRelease: ReturnType<typeof vi.fn>;
 	}> = [];
 	const noiseSynthInstances: Array<{ dispose: ReturnType<typeof vi.fn> }> = [];
+	const vibratoInstances: Array<{
+		frequency: ReturnType<typeof createSignal>;
+		depth: ReturnType<typeof createSignal>;
+	}> = [];
+	const filterInstances: Array<{
+		frequency: ReturnType<typeof createSignal>;
+		type: 'lowpass' | 'highpass';
+	}> = [];
 	const patternInstances: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
 	const loopInstances: Array<{ tick: (time?: number) => void }> = [];
 	const transport = {
@@ -26,8 +41,11 @@ const state = vi.hoisted(() => {
 	};
 
 	return {
+		createSignal,
 		synthInstances,
 		noiseSynthInstances,
+		vibratoInstances,
+		filterInstances,
 		patternInstances,
 		loopInstances,
 		transport,
@@ -38,8 +56,8 @@ const state = vi.hoisted(() => {
 vi.mock('tone', () => {
 	class TrackingSynth {
 		public oscillator: { type: string; width: { value: number } };
-		public frequency = { value: 440 };
-		public detune = { value: 0 };
+		public frequency = state.createSignal(440);
+		public detune = state.createSignal(0);
 		public envelope = { attack: 0, decay: 0, sustain: 0, release: 0 };
 		public triggerAttack = vi.fn();
 		public triggerAttackRelease = vi.fn();
@@ -112,10 +130,14 @@ vi.mock('tone', () => {
 	}
 
 	class MockVibrato {
-		public frequency = { value: 0 };
-		public depth = { value: 0 };
+		public frequency = state.createSignal(0);
+		public depth = state.createSignal(0);
 		public connect = vi.fn();
 		public dispose = vi.fn();
+
+		constructor() {
+			state.vibratoInstances.push(this);
+		}
 	}
 
 	class MockChorus {
@@ -128,10 +150,16 @@ vi.mock('tone', () => {
 	}
 
 	class MockFilter {
-		public frequency = { value: 0 };
+		public type: 'lowpass' | 'highpass' = 'lowpass';
+		public frequency = state.createSignal(0);
 		public Q = { value: 0 };
 		public connect = vi.fn();
 		public dispose = vi.fn();
+
+		constructor(options: { type: 'lowpass' | 'highpass' }) {
+			this.type = options.type;
+			state.filterInstances.push({ frequency: this.frequency, type: this.type });
+		}
 	}
 
 	class MockWaveform {
@@ -158,6 +186,7 @@ vi.mock('tone', () => {
 		}),
 		getContext: () => ({ rawContext: {} }),
 		getDestination: () => ({}),
+		now: () => 0,
 		getTransport: () => state.transport
 	};
 });
@@ -174,6 +203,8 @@ describe('synthesizer', () => {
 	beforeEach(() => {
 		state.synthInstances.length = 0;
 		state.noiseSynthInstances.length = 0;
+		state.vibratoInstances.length = 0;
+		state.filterInstances.length = 0;
 		state.patternInstances.length = 0;
 		state.loopInstances.length = 0;
 		state.transport.start.mockClear();
@@ -182,6 +213,10 @@ describe('synthesizer', () => {
 		state.transport.scheduleOnce.mockClear();
 		state.bitCrusher.connect.mockClear();
 		state.bitCrusher.dispose.mockClear();
+		state.synthInstances.forEach((instance) => {
+			instance.frequency.cancelScheduledValues.mockClear();
+			instance.frequency.setValueCurveAtTime.mockClear();
+		});
 	});
 
 	it('switches to NoiseSynth and disposes existing Synth', async () => {
@@ -282,6 +317,120 @@ describe('synthesizer', () => {
 
 		synth.updateParams({ frequency: 99_999 });
 		expect(firstSynth.frequency.value).toBe(2000);
+	});
+
+	it('schedules frequency curve on play when present', async () => {
+		const synth = await createSynthesizer({
+			frequency: 440,
+			duration: 500,
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 440 },
+					p1: { x: 0.3, y: 300 },
+					p2: { x: 0.7, y: 200 },
+					p3: { x: 1, y: 120 }
+				}
+			}
+		});
+		const firstSynth = state.synthInstances[0];
+
+		synth.play();
+
+		expect(firstSynth.frequency.cancelScheduledValues).toHaveBeenCalled();
+		expect(firstSynth.frequency.setValueCurveAtTime).toHaveBeenCalledWith(
+			expect.any(Array),
+			expect.any(Number),
+			0.5
+		);
+		const firstCancel = firstSynth.frequency.cancelScheduledValues.mock.invocationCallOrder[0];
+		const firstCurve = firstSynth.frequency.setValueCurveAtTime.mock.invocationCallOrder[0];
+		expect(firstCancel).toBeLessThan(firstCurve);
+		const samples = firstSynth.frequency.setValueCurveAtTime.mock.calls[0][0] as number[];
+		expect(samples).toHaveLength(128);
+	});
+
+	it('does not schedule any curves when curves object is empty', async () => {
+		const synth = await createSynthesizer({ curves: {} });
+		const firstSynth = state.synthInstances[0];
+
+		synth.play();
+
+		expect(firstSynth.frequency.setValueCurveAtTime).not.toHaveBeenCalled();
+	});
+
+	it('does not schedule frequency curve for noise voices', async () => {
+		const synth = await createSynthesizer({
+			waveform: 'noise',
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 800 },
+					p1: { x: 0.3, y: 600 },
+					p2: { x: 0.7, y: 400 },
+					p3: { x: 1, y: 200 }
+				}
+			}
+		});
+
+		synth.play();
+
+		expect(state.synthInstances).toHaveLength(0);
+		expect(state.noiseSynthInstances).toHaveLength(1);
+	});
+
+	it('skips curve scheduling in arp mode', async () => {
+		const synth = await createSynthesizer({
+			arpSpeed: 8,
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 1000 },
+					p1: { x: 0.4, y: 700 },
+					p2: { x: 0.8, y: 500 },
+					p3: { x: 1, y: 300 }
+				}
+			}
+		});
+		const firstSynth = state.synthInstances[0];
+
+		synth.play();
+
+		expect(firstSynth.frequency.setValueCurveAtTime).not.toHaveBeenCalled();
+	});
+
+	it('stop cancels scheduled automation on all curveable signals', async () => {
+		const synth = await createSynthesizer();
+		const firstSynth = state.synthInstances[0];
+		const vibrato = state.vibratoInstances[0];
+		const lpf = state.filterInstances.find((f) => f.type === 'lowpass');
+		const hpf = state.filterInstances.find((f) => f.type === 'highpass');
+
+		synth.stop();
+
+		expect(firstSynth.frequency.cancelScheduledValues).toHaveBeenCalled();
+		expect(vibrato.depth.cancelScheduledValues).toHaveBeenCalled();
+		expect(vibrato.frequency.cancelScheduledValues).toHaveBeenCalled();
+		expect(lpf?.frequency.cancelScheduledValues).toHaveBeenCalled();
+		expect(hpf?.frequency.cancelScheduledValues).toHaveBeenCalled();
+	});
+
+	it('restores static values when curve is removed', async () => {
+		const synth = await createSynthesizer({
+			frequency: 900,
+			lpfCutoff: 3200,
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 900 },
+					p1: { x: 0.3, y: 700 },
+					p2: { x: 0.7, y: 300 },
+					p3: { x: 1, y: 200 }
+				}
+			}
+		});
+		const firstSynth = state.synthInstances[0];
+
+		synth.updateParams({ curves: {} });
+
+		expect(firstSynth.frequency.cancelScheduledValues).toHaveBeenCalled();
+		expect(firstSynth.frequency.value).toBe(900);
 	});
 
 	it('applies updated frequency to retrigger loop without replaying', async () => {
