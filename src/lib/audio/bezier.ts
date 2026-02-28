@@ -49,13 +49,14 @@ export function logSweepCurve(startHz: number, endHz: number, shape = 0.5): Bezi
 	const safeEnd = Math.max(1, endHz);
 	const logStart = Math.log(safeStart);
 	const logEnd = Math.log(safeEnd);
-	const midValue = Math.exp((logStart + logEnd) / 2);
 	const clampedShape = Math.max(0, Math.min(1, shape));
+	const logP1Y = logStart + (logEnd - logStart) * clampedShape;
+	const logP2Y = logStart + (logEnd - logStart) * (1 - clampedShape);
 
 	return {
 		p0: { x: 0, y: safeStart },
-		p1: { x: clampedShape, y: midValue },
-		p2: { x: 1 - clampedShape, y: midValue },
+		p1: { x: clampedShape, y: Math.exp(logP1Y) },
+		p2: { x: 1 - clampedShape, y: Math.exp(logP2Y) },
 		p3: { x: 1, y: safeEnd }
 	};
 }

@@ -62,14 +62,35 @@ describe('sampleCurve', () => {
 
 describe('logSweepCurve', () => {
 	it('returns endpoints with safe positive clamp', () => {
-		const curve = logSweepCurve(1000, 100, 0.3);
-		expect(curve.p0.y).toBe(1000);
-		expect(curve.p3.y).toBe(100);
+		const curve = logSweepCurve(1200, 48, 0.2);
+		expect(curve.p0.y).toBeCloseTo(1200);
+		expect(curve.p3.y).toBeCloseTo(48);
+	});
+
+	it('downward sweep with non-mid shape avoids equal-handle plateau', () => {
+		const curve = logSweepCurve(1200, 48, 0.2);
+		expect(curve.p1.y).toBeGreaterThan(curve.p2.y);
+		expect(curve.p1.y).toBeGreaterThan(400);
+		expect(curve.p2.y).toBeLessThan(200);
+	});
+
+	it('upward sweep has increasing handle values', () => {
+		const curve = logSweepCurve(500, 1500, 0.3);
+		expect(curve.p1.y).toBeLessThan(curve.p2.y);
+	});
+
+	it('shape 0.5 keeps handles at geometric mean for compatibility', () => {
+		const curve = logSweepCurve(1200, 48, 0.5);
+		const geoMean = Math.sqrt(1200 * 48);
+		expect(curve.p1.y).toBeCloseTo(geoMean, 0);
+		expect(curve.p2.y).toBeCloseTo(geoMean, 0);
 	});
 
 	it('clamps invalid non-positive endpoints to 1Hz minimum', () => {
 		const curve = logSweepCurve(0, -20, 0.3);
 		expect(curve.p0.y).toBe(1);
 		expect(curve.p3.y).toBe(1);
+		expect(Number.isFinite(curve.p1.y)).toBe(true);
+		expect(Number.isFinite(curve.p2.y)).toBe(true);
 	});
 });

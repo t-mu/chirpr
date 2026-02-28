@@ -2459,7 +2459,7 @@ Set `retriggerRate` slider to any value above 0 and press play. The sound should
 
 ---
 
-## Task 31 — Fix `logSweepCurve`: Symmetric Plateau Instead of Smooth Log Sweep
+## ~~Task 31 — Fix `logSweepCurve`: Symmetric Plateau Instead of Smooth Log Sweep~~ ✅ DONE
 
 **Goal:** `logSweepCurve` in `src/lib/audio/bezier.ts` is supposed to produce a perceptually linear pitch sweep (equal semitones per millisecond). The current implementation places **both** control points at the same geometric-mean y-value, which creates an audible flat section around that midpoint for ~60% of the duration rather than a smooth continuous sweep.
 
