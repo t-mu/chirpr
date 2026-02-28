@@ -1108,3 +1108,1213 @@ Approximate rendered size per button: ~28 px tall × ~40–50 px wide (depending
   - `dashboardPreviewController.test.ts` (if added in Task 22)
 
 ---
+
+## ~~Task 24 — Bezier Curve Types & Math Utilities~~ ✅ DONE
+
+**Goal:** Lay the pure-logic foundation for parameter automation — no UI, no audio wiring yet. Define the data types, add the `curves` field to `SynthParams`, and implement the bezier math needed by both the canvas editor and the audio scheduler.
+
+### Steps
+
+1. **Create `src/lib/types/BezierCurve.ts`**
+
+   ```ts
+   /**
+    * A point in the bezier curve's 2D parameter space.
+    * x is always normalised time [0, 1] (0 = note start, 1 = note end).
+    * y is the actual parameter value in native units (e.g. Hz for frequency,
+    * not normalised). Storing native units avoids lossy conversions when
+    * applying curves to the audio engine.
+    */
+   export interface BezierPoint {
+     x: number;
+     y: number;
+   }
+
+   /**
+    * A cubic bezier curve defined by 4 control points.
+    * - p0: start anchor — x MUST always be 0
+    * - p1: first handle — freely positioned by the user
+    * - p2: second handle — freely positioned by the user
+    * - p3: end anchor — x MUST always be 1
+    *
+    * The constraint p1.x ≤ p2.x must be maintained so that the curve
+    * never goes backwards in time (a "loop" on the time axis would
+    * produce undefined audio scheduling behaviour).
+    */
+   export interface BezierCurve {
+     p0: BezierPoint;
+     p1: BezierPoint;
+     p2: BezierPoint;
+     p3: BezierPoint;
+   }
+
+   /**
+    * The subset of SynthParams keys that support bezier automation.
+    * Each maps to a single, continuously schedulable AudioParam in the
+    * signal chain. Params that are switched (waveform, arpPattern) or
+    * integer (bitDepth) are excluded.
+    *
+    * Add a compile-time check below so TypeScript catches typos:
+    *   type _Check = CurveableParam extends keyof SynthParams ? true : never;
+    */
+   export type CurveableParam =
+     | 'frequency'
+     | 'lpfCutoff'
+     | 'hpfCutoff'
+     | 'vibratoDepth'
+     | 'vibratoRate';
+   ```
+
+   Add the compile-time check immediately after the type declaration:
+   ```ts
+   import type { SynthParams } from './SynthParams';
+   // If this line produces a type error, a key in CurveableParam was removed
+   // from SynthParams — update CurveableParam to match.
+   type _CurveableParamCheck = CurveableParam extends keyof SynthParams ? true : never;
+   ```
+
+2. **Update `src/lib/types/SynthParams.ts`** — add the `curves` field at the end of the interface and set a safe default:
+
+   ```ts
+   import type { BezierCurve, CurveableParam } from './BezierCurve';
+
+   export interface SynthParams {
+     // ... all existing fields unchanged ...
+     /** Active automation curves, keyed by parameter name. Empty = no automation. */
+     curves: Partial<Record<CurveableParam, BezierCurve>>;
+   }
+
+   export const DEFAULT_PARAMS: SynthParams = {
+     // ... all existing values unchanged ...
+     curves: {}
+   };
+   ```
+
+3. **Update `src/lib/stores/synthParams.svelte.ts`**
+
+   `curves` is not in `NUMERIC_RANGES`, so the existing `sanitizeParams` loop already skips it. Add a comment to confirm this is intentional — a future developer adding a numeric key must also add it to `NUMERIC_RANGES`.
+
+   `Object.assign(params, sanitizeParams(nextParams))` in `setParams` overwrites the entire `curves` value, which is correct: loading a preset must replace all curves from the saved snapshot, not merge them.
+
+   `updateParam('curves', newMap)` passes through the object unchanged since `curves` is not in `NUMERIC_RANGES`. This is the correct path for curve edits from the Dashboard. Add a comment:
+   ```ts
+   // 'curves' is not in NUMERIC_RANGES — it passes through as-is.
+   // Callers are responsible for producing a valid Partial<Record<CurveableParam, BezierCurve>>.
+   ```
+
+4. **Create `src/lib/audio/bezier.ts`** — implement the complete math module:
+
+   ```ts
+   import type { BezierCurve, BezierPoint } from '$lib/types/BezierCurve';
+
+   /**
+    * Evaluate a cubic bezier curve at parameter t ∈ [0, 1] using the
+    * standard Bernstein polynomial form. Returns both x and y components.
+    *
+    * t values outside [0, 1] are clamped to avoid extrapolation.
+    */
+   export function evaluateBezier(
+     t: number,
+     p0: BezierPoint,
+     p1: BezierPoint,
+     p2: BezierPoint,
+     p3: BezierPoint
+   ): BezierPoint {
+     const tc = Math.max(0, Math.min(1, t)); // clamp t
+     const mt = 1 - tc;
+     return {
+       x: mt ** 3 * p0.x + 3 * mt ** 2 * tc * p1.x + 3 * mt * tc ** 2 * p2.x + tc ** 3 * p3.x,
+       y: mt ** 3 * p0.y + 3 * mt ** 2 * tc * p1.y + 3 * mt * tc ** 2 * p2.y + tc ** 3 * p3.y,
+     };
+   }
+
+   /**
+    * Sample the bezier curve into a Float32Array of `n` y-values, evaluated
+    * at evenly-spaced t values: t = 0, 1/(n-1), 2/(n-1), …, 1.
+    *
+    * The resulting array is suitable for Web Audio's AudioParam.setValueCurveAtTime(),
+    * which interpolates linearly between consecutive values over the specified duration.
+    *
+    * Sampling is done in bezier-parameter space (equal t steps). For most params
+    * this produces perceptually acceptable results. For frequency, use logSweepCurve()
+    * to build the curve so the y-values are already in perceptual space.
+    *
+    * Minimum n is 2 (start and end values only). n=1 is guarded against.
+    */
+   export function sampleCurve(curve: BezierCurve, n = 128): Float32Array {
+     const count = Math.max(2, n);
+     const out = new Float32Array(count);
+     const { p0, p1, p2, p3 } = curve;
+     for (let i = 0; i < count; i++) {
+       out[i] = evaluateBezier(i / (count - 1), p0, p1, p2, p3).y;
+     }
+     return out;
+   }
+
+   /**
+    * Create a flat (no-op) curve that holds `value` constant for the full duration.
+    * This is the seed curve used when the user first enables automation for a param —
+    * it sounds identical to the static slider until the user drags the handles.
+    */
+   export function flatCurve(value: number): BezierCurve {
+     return {
+       p0: { x: 0,     y: value },
+       p1: { x: 1 / 3, y: value },
+       p2: { x: 2 / 3, y: value },
+       p3: { x: 1,     y: value },
+     };
+   }
+
+   /**
+    * Create a smooth sweep from `startValue` to `endValue`.
+    *
+    * `shape` ∈ [0, 1] controls the easing:
+    *   0.0 = very fast initial movement, then slow (ease-out)
+    *   0.5 = roughly linear (handles at 1/3 and 2/3 of time axis)
+    *   1.0 = slow start, fast finish (ease-in)
+    *
+    * Default shape = 0.5 gives a near-linear sweep. Use 0.2–0.3 for snappy
+    * retro laser effects where the pitch drops fast then trails off.
+    */
+   export function sweepCurve(
+     startValue: number,
+     endValue: number,
+     shape = 0.5
+   ): BezierCurve {
+     return {
+       p0: { x: 0,         y: startValue },
+       p1: { x: shape,     y: startValue },
+       p2: { x: 1 - shape, y: endValue   },
+       p3: { x: 1,         y: endValue   },
+     };
+   }
+
+   /**
+    * Create a frequency sweep whose y-values are distributed logarithmically,
+    * so the pitch change sounds perceptually linear (equal semitone steps per
+    * unit time) rather than linearly proportional to Hz.
+    *
+    * Use this for all frequency automation curves. Using sweepCurve() for
+    * frequency produces a sweep that sounds fast at low frequencies and
+    * slow at high frequencies because human pitch perception is logarithmic.
+    *
+    * Example: logSweepCurve(1000, 100, 0.3) sounds like the pitch drops by
+    * the same number of semitones each millisecond, whereas sweepCurve would
+    * drop quickly through the high range and barely move at the bottom.
+    */
+   export function logSweepCurve(
+     startHz: number,
+     endHz: number,
+     shape = 0.5,
+     n = 32
+   ): BezierCurve {
+     // Build n intermediate points by interpolating in log space,
+     // then fit a bezier through the endpoints and use the shape param
+     // to position the handles. The resulting bezier approximates the
+     // log curve closely enough for short SFX durations.
+     const logStart = Math.log(Math.max(1, startHz));
+     const logEnd   = Math.log(Math.max(1, endHz));
+
+     // Compute the midpoint value in log space — use it to position handles.
+     const midValue = Math.exp((logStart + logEnd) / 2);
+
+     return {
+       p0: { x: 0,         y: startHz  },
+       p1: { x: shape,     y: midValue },
+       p2: { x: 1 - shape, y: midValue },
+       p3: { x: 1,         y: endHz    },
+     };
+   }
+   ```
+
+   > **Why not sample the curve in log space?** `setValueCurveAtTime` does linear interpolation between the provided samples. If we built a full N-point array sampled in log space, it would work but be more code for marginal benefit at SFX durations. The bezier with a log-space midpoint handle gives a good-enough approximation.
+
+### Unit Tests (`src/lib/audio/bezier.test.ts`)
+
+```ts
+describe('evaluateBezier', () => {
+  const p0 = { x: 0, y: 100 };
+  const p1 = { x: 1/3, y: 100 };
+  const p2 = { x: 2/3, y: 200 };
+  const p3 = { x: 1, y: 200 };
+
+  test('t=0 returns p0', () => {
+    const r = evaluateBezier(0, p0, p1, p2, p3);
+    expect(r.x).toBeCloseTo(0);
+    expect(r.y).toBeCloseTo(100);
+  });
+
+  test('t=1 returns p3', () => {
+    const r = evaluateBezier(1, p0, p1, p2, p3);
+    expect(r.x).toBeCloseTo(1);
+    expect(r.y).toBeCloseTo(200);
+  });
+
+  test('t=0.5 on straight-line curve returns midpoint', () => {
+    const straight = { x: 0, y: 0 };
+    const r = evaluateBezier(0.5,
+      { x: 0, y: 0 }, { x: 1/3, y: 1/3 },
+      { x: 2/3, y: 2/3 }, { x: 1, y: 1 });
+    expect(r.y).toBeCloseTo(0.5);
+  });
+
+  test('t outside [0,1] is clamped', () => {
+    expect(evaluateBezier(-1, p0, p1, p2, p3).y).toBeCloseTo(100);
+    expect(evaluateBezier(2, p0, p1, p2, p3).y).toBeCloseTo(200);
+  });
+});
+
+describe('sampleCurve', () => {
+  test('flat curve returns all equal values', () => {
+    const s = sampleCurve(flatCurve(440), 128);
+    expect(s.length).toBe(128);
+    expect(s.every(v => Math.abs(v - 440) < 0.01)).toBe(true);
+  });
+
+  test('sweep curve: first=start, last=end, monotonically increasing', () => {
+    const s = sampleCurve(sweepCurve(100, 1000), 64);
+    expect(s[0]).toBeCloseTo(100);
+    expect(s[63]).toBeCloseTo(1000);
+    for (let i = 1; i < s.length; i++) expect(s[i]).toBeGreaterThanOrEqual(s[i-1]);
+  });
+
+  test('n=1 is guarded — returns at least 2 elements', () => {
+    expect(sampleCurve(flatCurve(440), 1).length).toBe(2);
+  });
+
+  test('returns Float32Array', () => {
+    expect(sampleCurve(flatCurve(440), 8)).toBeInstanceOf(Float32Array);
+  });
+});
+```
+
+---
+
+## Task 25 — BezierEditor Canvas Component
+
+**Goal:** Build the interactive canvas widget that lets the user see and drag a bezier curve. It is a completely self-contained display+input component — no Tone.js, no store, no audio imports.
+
+### Key design decisions to understand before implementing
+
+**Canvas coordinate system:**
+The canvas has a fixed intrinsic resolution of `240 × 100` px defined in the `width`/`height` attributes. CSS then stretches it to fill the container (`width: 100%; height: auto`). This means pointer event coordinates (in CSS pixels) must be scaled to canvas pixels before use. Always compute this ratio from `canvas.getBoundingClientRect()` at the time of the event — do not cache it, since the container width can change if the user resizes.
+
+**Why use `ctx.bezierCurveTo` instead of sampling a polyline:**
+Canvas has a native cubic bezier command that draws the curve mathematically exact with no visible segmentation. Use `ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)` after `ctx.moveTo(p0x, p0y)`. This is smoother than sampling 64 polyline segments and also avoids importing `sampleCurve` into a UI component (keeping the component truly self-contained in terms of dependencies — it only needs `BezierCurve` type from the types file).
+
+**`$effect` dependency tracking in Svelte 5:**
+The `draw()` function reads `curve.p0.x`, `curve.p0.y`, etc. These are prop reads — Svelte 5 tracks them as reactive reads when they happen inside an `$effect`. To ensure Svelte registers the dependency on all four points, read all eight fields explicitly at the top of the effect body before calling `draw()`. Simply calling `draw()` from inside the effect is enough for Svelte to track the reads, but being explicit prevents accidental tracking bugs if the draw function is later refactored.
+
+**Pointer capture:**
+`canvas.setPointerCapture(e.pointerId)` locks all future pointer events to this element even when the pointer moves outside the canvas boundary. This is essential for drag — without it, `pointermove` stops firing as soon as the cursor leaves the canvas element. Call it on `e.currentTarget` (the canvas), not `e.target` (which could be a child).
+
+**Hit test order matters:**
+When a handle point (p1 or p2) is near an anchor (p0 or p3), both are within hit radius. Test anchors last so they "win" — anchors are the more important points for pitch sweeps (they set start/end values) and are expected to be reachable even when handles are stacked on top.
+
+**`touch-action: none` is mandatory:**
+On touch devices, the browser intercepts pointer events for scrolling unless `touch-action: none` is set on the element. Without it, `pointermove` never fires after `pointerdown` on mobile and the editor appears completely broken.
+
+### Complete implementation
+
+Create **`src/lib/components/BezierEditor.svelte`** with the following complete source:
+
+```svelte
+<script lang="ts">
+  import type { BezierCurve, BezierPoint } from '$lib/types/BezierCurve';
+
+  interface Props {
+    curve: BezierCurve;
+    paramMin: number;
+    paramMax: number;
+    onChange: (curve: BezierCurve) => void;
+  }
+
+  let { curve, paramMin, paramMax, onChange }: Props = $props();
+
+  // Intrinsic canvas resolution. These values are used in both the
+  // template (width/height attrs) and the coordinate helpers below.
+  // CSS then scales the canvas to fill the container.
+  const W = 240;
+  const H = 100;
+
+  // Hit-test radius in canvas pixels. 12px feels comfortable on both
+  // mouse and touch without making it hard to distinguish adjacent points.
+  const HIT_RADIUS = 12;
+
+  // Visual size of the drawn control point squares (half-side length).
+  const PT = 4;
+
+  let canvas = $state<HTMLCanvasElement | null>(null);
+  // Which control point the user is currently dragging, or null.
+  let activePoint = $state<'p0' | 'p1' | 'p2' | 'p3' | null>(null);
+
+  // --- Coordinate helpers ---
+
+  /** Normalised x [0,1] → canvas pixel X */
+  function cx(normX: number): number {
+    return normX * W;
+  }
+
+  /** Param value (in native units) → canvas pixel Y.
+   *  Y=0 is the top of the canvas (= paramMax), Y=H is the bottom (= paramMin). */
+  function cy(value: number): number {
+    return (1 - (value - paramMin) / (paramMax - paramMin)) * H;
+  }
+
+  /** Canvas pixel X → normalised x, clamped to [0, 1] */
+  function normX(canvasX: number): number {
+    return Math.max(0, Math.min(1, canvasX / W));
+  }
+
+  /** Canvas pixel Y → param value, clamped to [paramMin, paramMax] */
+  function paramValue(canvasY: number): number {
+    return Math.max(
+      paramMin,
+      Math.min(paramMax, paramMin + (1 - canvasY / H) * (paramMax - paramMin))
+    );
+  }
+
+  /**
+   * Convert a PointerEvent's client coordinates to canvas-space pixel coordinates,
+   * accounting for the CSS scaling of the canvas element.
+   * Must be called with a fresh getBoundingClientRect() — do not cache the rect.
+   */
+  function toCanvasCoords(e: PointerEvent): { x: number; y: number } {
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (W / rect.width),
+      y: (e.clientY - rect.top)  * (H / rect.height),
+    };
+  }
+
+  // --- Drawing ---
+
+  /** Draw a control point square centred at (canvasX, canvasY).
+   *  filled=true → solid square (anchor); filled=false → hollow (handle).
+   *  active=true → yellow highlight instead of cyan. */
+  function drawPoint(
+    ctx: CanvasRenderingContext2D,
+    p: BezierPoint,
+    filled: boolean,
+    active: boolean
+  ): void {
+    const x = cx(p.x);
+    const y = cy(p.y);
+    const color = active ? '#ffe600' : '#00e5ff';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    if (filled) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x - PT, y - PT, PT * 2, PT * 2);
+    } else {
+      ctx.fillStyle = '#0a0a1a';
+      ctx.fillRect(x - PT, y - PT, PT * 2, PT * 2);
+      ctx.strokeRect(x - PT, y - PT, PT * 2, PT * 2);
+    }
+  }
+
+  function draw(): void {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 1. Background
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+
+    // 2. Grid lines — vertical (time) and horizontal (value) at 0.25 / 0.5 / 0.75
+    ctx.strokeStyle = '#1a3350';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    for (const t of [0.25, 0.5, 0.75]) {
+      ctx.beginPath();
+      ctx.moveTo(cx(t), 0);
+      ctx.lineTo(cx(t), H);
+      ctx.stroke();
+      const v = paramMin + t * (paramMax - paramMin);
+      ctx.beginPath();
+      ctx.moveTo(0, cy(v));
+      ctx.lineTo(W, cy(v));
+      ctx.stroke();
+    }
+
+    // 3. Bezier curve — drawn with the native canvas command for a perfectly smooth line.
+    //    No need to sample the curve into a polyline; ctx.bezierCurveTo handles the math.
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(cx(curve.p0.x), cy(curve.p0.y));
+    ctx.bezierCurveTo(
+      cx(curve.p1.x), cy(curve.p1.y),
+      cx(curve.p2.x), cy(curve.p2.y),
+      cx(curve.p3.x), cy(curve.p3.y)
+    );
+    ctx.stroke();
+
+    // 4. Tangent handle arms — dashed lines from anchors to their adjacent handles.
+    //    These visually communicate which handle belongs to which anchor.
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+
+    ctx.beginPath();
+    ctx.moveTo(cx(curve.p0.x), cy(curve.p0.y));
+    ctx.lineTo(cx(curve.p1.x), cy(curve.p1.y));
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx(curve.p3.x), cy(curve.p3.y));
+    ctx.lineTo(cx(curve.p2.x), cy(curve.p2.y));
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+
+    // 5. Control points — draw in back-to-front order so anchors appear on top of handles
+    //    when they overlap (e.g. at the curve edges).
+    drawPoint(ctx, curve.p1, false, activePoint === 'p1');
+    drawPoint(ctx, curve.p2, false, activePoint === 'p2');
+    drawPoint(ctx, curve.p0, true,  activePoint === 'p0'); // anchor, drawn on top
+    drawPoint(ctx, curve.p3, true,  activePoint === 'p3'); // anchor, drawn on top
+  }
+
+  // Redraw whenever any reactive value used by draw() changes.
+  // Explicitly reading all curve fields here ensures Svelte 5 registers
+  // the fine-grained dependency on each point coordinate, not just the
+  // top-level `curve` object reference.
+  $effect(() => {
+    // Access every reactive value that draw() uses so Svelte tracks them.
+    const _p = curve.p0.x + curve.p0.y + curve.p1.x + curve.p1.y +
+               curve.p2.x + curve.p2.y + curve.p3.x + curve.p3.y;
+    void _p;
+    // canvas is $state — accessing it here tracks when bind:this fires.
+    draw();
+  });
+
+  // --- Hit testing ---
+
+  /**
+   * Return which control point (if any) is within HIT_RADIUS canvas pixels
+   * of (canvasX, canvasY). Test handles (p1, p2) before anchors (p0, p3) so
+   * anchors win when they overlap a handle — anchors are the more critical targets.
+   */
+  function hitTest(canvasX: number, canvasY: number): 'p0' | 'p1' | 'p2' | 'p3' | null {
+    const order: Array<{ key: 'p0' | 'p1' | 'p2' | 'p3'; p: BezierPoint }> = [
+      { key: 'p1', p: curve.p1 },
+      { key: 'p2', p: curve.p2 },
+      { key: 'p0', p: curve.p0 },
+      { key: 'p3', p: curve.p3 },
+    ];
+    for (const { key, p } of order) {
+      const dx = canvasX - cx(p.x);
+      const dy = canvasY - cy(p.y);
+      if (Math.sqrt(dx * dx + dy * dy) <= HIT_RADIUS) return key;
+    }
+    return null;
+  }
+
+  // --- Pointer event handlers ---
+
+  function onPointerDown(e: PointerEvent): void {
+    const { x, y } = toCanvasCoords(e);
+    const hit = hitTest(x, y);
+    if (!hit) return;
+    e.preventDefault(); // prevent text selection / browser defaults during drag
+    activePoint = hit;
+    // Pointer capture locks all future pointer events to this element even
+    // when the pointer moves outside — essential for uninterrupted dragging.
+    (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: PointerEvent): void {
+    if (!activePoint) return;
+    const { x, y } = toCanvasCoords(e);
+    const newNX = normX(x);
+    const newPV = paramValue(y);
+
+    // Build a new curve object — do not mutate the prop directly.
+    const next: BezierCurve = {
+      p0: { ...curve.p0 },
+      p1: { ...curve.p1 },
+      p2: { ...curve.p2 },
+      p3: { ...curve.p3 },
+    };
+
+    if (activePoint === 'p0') {
+      // Anchor: x is locked to 0, only y moves
+      next.p0 = { x: 0, y: newPV };
+    } else if (activePoint === 'p3') {
+      // Anchor: x is locked to 1, only y moves
+      next.p3 = { x: 1, y: newPV };
+    } else if (activePoint === 'p1') {
+      // Handle: x must not exceed p2.x (handles cannot cross in time)
+      next.p1 = { x: Math.min(newNX, next.p2.x), y: newPV };
+    } else if (activePoint === 'p2') {
+      // Handle: x must not be less than p1.x
+      next.p2 = { x: Math.max(newNX, next.p1.x), y: newPV };
+    }
+
+    onChange(next);
+  }
+
+  function onPointerUp(): void {
+    activePoint = null;
+  }
+</script>
+
+<canvas
+  bind:this={canvas}
+  width={W}
+  height={H}
+  aria-label="Bezier curve editor"
+  role="img"
+  onpointerdown={onPointerDown}
+  onpointermove={onPointerMove}
+  onpointerup={onPointerUp}
+  onpointercancel={onPointerUp}
+></canvas>
+
+<style>
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 2px solid var(--accent, #00e5ff);
+    box-shadow: 4px 4px 0 #000;
+    image-rendering: pixelated;
+    cursor: crosshair;
+    /* Prevents the browser from stealing pointer events for scrolling on touch.
+       Without this, pointermove never fires during a touch drag on mobile. */
+    touch-action: none;
+  }
+</style>
+```
+
+### Additional implementation notes
+
+**Active point highlighting:** The `activePoint` state drives the yellow highlight on the point being dragged. This gives immediate visual feedback confirming which point the user grabbed. Yellow (`#ffe600`) is already used in the app as the "active/flash" colour.
+
+**Why `onpointercancel` calls `onPointerUp`:** If the browser forcefully interrupts a pointer sequence (e.g. the user answers a phone call while touching the screen), `pointercancel` fires instead of `pointerup`. Without this handler the drag state stays active and the next touch moves the wrong point.
+
+**Do not call `draw()` directly from event handlers:** Let the `$effect` do it. When `onChange(next)` is called, the parent updates its state → Svelte re-renders → the `curve` prop changes → the `$effect` fires → `draw()` runs. Calling `draw()` directly from the handler would double-draw on every move.
+
+**No `sampleCurve` import needed here.** The component uses `ctx.bezierCurveTo` for drawing (native, mathematically exact) and delegates all audio-related sampling to the synthesizer. Keeping the import out of this file prevents accidental coupling.
+
+### Unit Tests (`src/lib/components/BezierEditor.test.ts`)
+
+This is a browser component — use the `client` Vitest project (Playwright/Chromium):
+
+```ts
+import { render } from 'vitest-browser-svelte';
+import { expect, test } from 'vitest';
+import BezierEditor from './BezierEditor.svelte';
+import { flatCurve } from '$lib/audio/bezier';
+
+test('mounts without error and renders a canvas element', async () => {
+  const { container } = render(BezierEditor, {
+    curve: flatCurve(440),
+    paramMin: 20,
+    paramMax: 2000,
+    onChange: () => {},
+  });
+  expect(container.querySelector('canvas')).not.toBeNull();
+});
+
+test('calls onChange when a control point is dragged', async () => {
+  let received: BezierCurve | null = null;
+  const { container } = render(BezierEditor, {
+    curve: flatCurve(440),
+    paramMin: 20,
+    paramMax: 2000,
+    onChange: (c) => { received = c; },
+  });
+  const canvas = container.querySelector('canvas')!;
+  // Simulate a pointerdown on p0 (left edge, vertically centred)
+  // then a pointermove upward, then pointerup.
+  canvas.dispatchEvent(new PointerEvent('pointerdown', {
+    clientX: 0, clientY: canvas.getBoundingClientRect().height / 2,
+    pointerId: 1, bubbles: true,
+  }));
+  canvas.dispatchEvent(new PointerEvent('pointermove', {
+    clientX: 0, clientY: 0, // drag to top = paramMax
+    pointerId: 1, bubbles: true,
+  }));
+  canvas.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
+  expect(received).not.toBeNull();
+  // p0.y should now be close to paramMax (2000 Hz)
+  expect((received as BezierCurve).p0.y).toBeGreaterThan(1800);
+});
+```
+
+---
+
+## Task 26 — Synthesizer & Exporter Automation Scheduling
+
+**Goal:** Wire bezier curves into actual audio. When `play()` is called and a param has an active curve, schedule `setValueCurveAtTime` on the corresponding AudioParam so the value glides according to the curve over the note duration. Curves do not apply during arpeggio/retrigger modes or preview holds.
+
+### Critical scheduling rules to understand first
+
+**`cancelScheduledValues` must precede `setValueCurveAtTime`:** Web Audio's scheduler is additive — values accumulate unless explicitly cancelled. If the user plays twice in a row (e.g. clicks Play, sound stops, clicks again), the second `setValueCurveAtTime` call would be queued after the first one's leftover events if you don't cancel first. Always call `cancelScheduledValues(now)` on the target AudioParam immediately before scheduling the curve.
+
+**Use `Tone.now()` not `0` for the live context:** `Tone.now()` returns the current audio context time in seconds. The curve should start playing immediately, so pass `Tone.now()` as the start time for live playback. In the `OfflineAudioContext` (exporter), the current time is always `0`, so pass `0` there instead.
+
+**`setValueCurveAtTime` requires at least 2 values:** The Web Audio spec requires the values array to have at least 2 elements. `sampleCurve` already enforces `n ≥ 2`, so this is guaranteed, but worth noting.
+
+**Curves only apply during `play()`, not `startPreview()`:** `startPreview()` calls `triggerAttack()` which sustains indefinitely with no known duration. There is no `durationSec` to map the curve over, so `applyCurves` must not be called from `startPreview`. The preview is meant to let the user hear the current static settings, not a time-evolving sweep.
+
+**Arpeggio and retrigger modes skip curves:** In arp/retrigger mode, the `Tone.Transport` drives the pitch through a `Pattern` or `Loop`. Scheduling a `setValueCurveAtTime` on `voice.frequency` while the pattern is also writing to it creates a race condition where one overwrites the other unpredictably. Skip `applyCurves` entirely when either mode is active. The relevant guard is already in `play()`: the arp and retrigger branches return early — place `applyCurves` only in the fallthrough branch after both early returns.
+
+### Step 1 — `src/lib/audio/synthesizer.ts`
+
+Add the import at the top:
+```ts
+import { sampleCurve } from './bezier';
+```
+
+Add the `applyCurves` private method:
+```ts
+/**
+ * Schedule bezier curve automation on active AudioParams for the given duration.
+ * Must only be called from play() in the non-arp, non-retrigger branch,
+ * and never from startPreview() (which has no fixed duration).
+ *
+ * cancelScheduledValues is called before each setValueCurveAtTime to clear
+ * any leftover scheduled events from a previous play() call.
+ */
+private applyCurves(durationSec: number): void {
+  const curves = this.params.curves ?? {};
+  const now = Tone.now();
+  const N = 128; // sample count — 128 gives ~0.8ms resolution at 160ms duration
+
+  if (curves.frequency && this.voice instanceof Tone.Synth) {
+    const samples = sampleCurve(curves.frequency, N);
+    this.voice.frequency.cancelScheduledValues(now);
+    this.voice.frequency.setValueCurveAtTime(samples, now, durationSec);
+  }
+  // NoiseSynth has no frequency AudioParam — skip when voice is NoiseSynth.
+
+  if (curves.lpfCutoff) {
+    const samples = sampleCurve(curves.lpfCutoff, N);
+    this.lpf.frequency.cancelScheduledValues(now);
+    this.lpf.frequency.setValueCurveAtTime(samples, now, durationSec);
+  }
+  if (curves.hpfCutoff) {
+    const samples = sampleCurve(curves.hpfCutoff, N);
+    this.hpf.frequency.cancelScheduledValues(now);
+    this.hpf.frequency.setValueCurveAtTime(samples, now, durationSec);
+  }
+  if (curves.vibratoDepth) {
+    const samples = sampleCurve(curves.vibratoDepth, N);
+    this.vibrato.depth.cancelScheduledValues(now);
+    this.vibrato.depth.setValueCurveAtTime(samples, now, durationSec);
+  }
+  if (curves.vibratoRate) {
+    const samples = sampleCurve(curves.vibratoRate, N);
+    this.vibrato.frequency.cancelScheduledValues(now);
+    this.vibrato.frequency.setValueCurveAtTime(samples, now, durationSec);
+  }
+}
+```
+
+Update `play()` — call `applyCurves` only in the plain-voice branch (after both arp and retrigger early returns):
+```ts
+play(note?: string | number): void {
+  this.stopPreview();
+  // ... (existing note/frequency resolution code unchanged) ...
+
+  const sec = this.params.duration / 1000;
+
+  if (isArpeggioEnabled(this.params)) {
+    // ... (existing arp branch — no applyCurves here) ...
+    return;
+  }
+  if (isRetriggerEnabled(this.params)) {
+    // ... (existing retrigger branch — no applyCurves here) ...
+    return;
+  }
+
+  // Plain voice: trigger and apply curves
+  if (this.voice instanceof Tone.NoiseSynth) {
+    this.voice.triggerAttackRelease(sec);
+  } else {
+    this.voice.triggerAttackRelease(this.currentFrequency, sec);
+  }
+  this.applyCurves(sec); // ← add this line
+}
+```
+
+Update `stop()` to cancel any in-flight curve automation before stopping the voice:
+```ts
+stop(): void {
+  // Cancel curve automation before releasing the voice to prevent
+  // the AudioParam from gliding after the sound has stopped.
+  const now = Tone.now();
+  if (this.voice instanceof Tone.Synth) {
+    this.voice.frequency.cancelScheduledValues(now);
+  }
+  this.lpf.frequency.cancelScheduledValues(now);
+  this.hpf.frequency.cancelScheduledValues(now);
+  this.vibrato.depth.cancelScheduledValues(now);
+  this.vibrato.frequency.cancelScheduledValues(now);
+
+  // ... rest of existing stop() unchanged (Transport.cancel, triggerRelease, etc.) ...
+}
+```
+
+Update `applyParams()` — add cleanup at the end. When the user disables a curve (curves object no longer has the key), `applyParams` is called with the updated params. Cancel any stale scheduled values and restore the static value so the static slider takes effect immediately:
+```ts
+// Add at the end of applyParams(), after all existing value assignments:
+private restoreStaticParams(params: SynthParams): void {
+  const curves = params.curves ?? {};
+  const now = Tone.now();
+
+  if (!curves.frequency && this.voice instanceof Tone.Synth) {
+    this.voice.frequency.cancelScheduledValues(now);
+    this.voice.frequency.value = params.frequency;
+  }
+  if (!curves.lpfCutoff) {
+    this.lpf.frequency.cancelScheduledValues(now);
+    this.lpf.frequency.value = clampParam('lpfCutoff', params.lpfCutoff);
+  }
+  if (!curves.hpfCutoff) {
+    this.hpf.frequency.cancelScheduledValues(now);
+    this.hpf.frequency.value = clampParam('hpfCutoff', params.hpfCutoff);
+  }
+  if (!curves.vibratoDepth) {
+    this.vibrato.depth.cancelScheduledValues(now);
+    this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
+  }
+  if (!curves.vibratoRate) {
+    this.vibrato.frequency.cancelScheduledValues(now);
+    this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
+  }
+}
+```
+Call `this.restoreStaticParams(params)` at the end of `applyParams()`.
+
+### Step 2 — `src/lib/audio/exporter.ts`
+
+The exporter uses raw Web Audio API nodes (`OscillatorNode`, `BiquadFilter`), not Tone.js wrappers. `AudioParam.setValueCurveAtTime` is the same standard method. Use `0` as the start time (the offline context starts at time 0).
+
+Add the import:
+```ts
+import { sampleCurve } from './bezier';
+```
+
+Add curve scheduling after the initial static values are set on each node, but **before** `source.start(0)` — scheduled values must be queued before the source starts:
+```ts
+// After setting oscillator.frequency.setValueAtTime(...) and
+// after workletNode.parameters.get('bitDepth')?.setValueAtTime(...):
+
+const curves = params.curves ?? {};
+const N = 256; // higher sample count in the offline render for accuracy
+
+if (curves.frequency && params.waveform !== 'noise') {
+  // Overrides the static frequency set above — the curve starts at p0.y
+  // and sweeps to p3.y over the full durationSeconds.
+  const samples = sampleCurve(curves.frequency, N);
+  (source as OscillatorNode).frequency.setValueCurveAtTime(samples, 0, durationSeconds);
+}
+if (curves.lpfCutoff) {
+  const samples = sampleCurve(curves.lpfCutoff, N);
+  lpf.frequency.setValueCurveAtTime(samples, 0, durationSeconds);
+}
+if (curves.hpfCutoff) {
+  const samples = sampleCurve(curves.hpfCutoff, N);
+  hpf.frequency.setValueCurveAtTime(samples, 0, durationSeconds);
+}
+// vibratoDepth and vibratoRate curves are NOT exported.
+// The offline renderer uses a raw OscillatorNode and does not reconstruct
+// a Tone.Vibrato effect. These curves are silently ignored during export.
+```
+
+### Unit Tests (`src/lib/audio/synthesizer.test.ts`)
+
+Add to the synthesizer mock: each signal (voice.frequency, lpf.frequency, etc.) needs `cancelScheduledValues` and `setValueCurveAtTime` as jest/vitest mock functions. Example mock signal factory:
+```ts
+const mockSignal = () => ({
+  value: 440,
+  cancelScheduledValues: vi.fn(),
+  setValueCurveAtTime: vi.fn(),
+  setValueAtTime: vi.fn(),
+  linearRampToValueAtTime: vi.fn(),
+});
+```
+
+Test cases:
+- Calling `play()` with `params.curves.frequency` set → `voice.frequency.cancelScheduledValues` is called before `voice.frequency.setValueCurveAtTime`
+- Calling `play()` with `params.curves.frequency` set → `setValueCurveAtTime` receives a `Float32Array` of length 128 and the correct `durationSec`
+- Calling `play()` with `params.curves` empty → `setValueCurveAtTime` is never called on any signal
+- Calling `play()` when waveform is `'noise'` with `params.curves.frequency` set → `setValueCurveAtTime` is **not** called on frequency (NoiseSynth has no frequency signal)
+- Calling `play()` when `arpSpeed > 0` with a frequency curve → `setValueCurveAtTime` is **not** called (arp mode skips curves)
+- Calling `stop()` → `cancelScheduledValues` is called on voice frequency, lpf, hpf, vibrato depth, vibrato frequency
+- Calling `updateParams({ curves: {} })` when a curve was previously active → `restoreStaticParams` calls `cancelScheduledValues` and restores the `.value`
+
+---
+
+## Task 27 — Dashboard Automation UI (CurvePanel)
+
+**Goal:** Add a dedicated AUTOMATION section to the Dashboard where users can enable/disable per-parameter bezier curves and edit them live via the BezierEditor. Wire curve changes through the existing `applyParam` pipeline so debounced previews trigger automatically on every drag.
+
+### Data flow reminder
+
+```
+BezierEditor.onChange(newCurve)
+  → setCurve(key, newCurve)          [Dashboard]
+    → applyParam('curves', newMap)   [Dashboard]
+      → updateParam('curves', newMap) [synthParams store]  ← passes through as-is (not in NUMERIC_RANGES)
+      → synthesizer.updateParams({ curves: newMap })       ← calls applyParams → restoreStaticParams
+      → debounced preview fires 150ms later                ← existing logic, no changes needed
+```
+
+There is no new wiring needed for the preview — the existing debounce in `applyParam` handles it.
+
+### Step 1 — `src/lib/components/Dashboard.svelte` script additions
+
+Add imports (verify `PARAM_META` is already imported before adding the new ones):
+```ts
+import BezierEditor from '$lib/components/BezierEditor.svelte';
+import { flatCurve } from '$lib/audio/bezier';
+import type { BezierCurve, CurveableParam } from '$lib/types/BezierCurve';
+```
+
+Add the curveable-param config array and helper functions inside the script block:
+```ts
+// Ordered list of params that support automation, with display labels.
+// Order determines the UI order in the AUTOMATION section.
+const CURVEABLE_PARAMS: { key: CurveableParam; label: string }[] = [
+  { key: 'frequency',    label: 'PITCH'      },
+  { key: 'lpfCutoff',   label: 'LPF CUTOFF' },
+  { key: 'hpfCutoff',   label: 'HPF CUTOFF' },
+  { key: 'vibratoDepth', label: 'VIB DEPTH' },
+  { key: 'vibratoRate',  label: 'VIB RATE'  },
+];
+
+/**
+ * Toggle a curve on or off for the given parameter.
+ * Enabling seeds a flat curve at the param's current static value so the
+ * sound is initially unchanged — the user must drag a handle to create a sweep.
+ * Disabling removes the curve entirely; restoreStaticParams() in the
+ * synthesizer then restores the static slider value.
+ */
+function toggleCurve(key: CurveableParam): void {
+  const current = params.curves ?? {};
+  if (current[key]) {
+    // Disable: build a new map without this key
+    const next = { ...current };
+    delete next[key];
+    void applyParam('curves', next);
+  } else {
+    // Enable: seed a flat curve at the current static value
+    const startValue = params[key] as number;
+    void applyParam('curves', { ...current, [key]: flatCurve(startValue) });
+  }
+}
+
+/**
+ * Update one curve in the map. Called by BezierEditor.onChange on every
+ * drag movement. The spread creates a new object so Svelte's reactivity
+ * picks up the change (mutating params.curves directly would not trigger
+ * fine-grained updates for subscribers reading the whole curves map).
+ */
+function setCurve(key: CurveableParam, curve: BezierCurve): void {
+  void applyParam('curves', { ...(params.curves ?? {}), [key]: curve });
+}
+```
+
+### Step 2 — template addition
+
+Add the AUTOMATION `ResponsiveSection` to the **left column**, directly below the existing EFFECTS section:
+
+```svelte
+<ResponsiveSection title="AUTOMATION">
+  {#each CURVEABLE_PARAMS as { key, label } (key)}
+    <div class="curve-row">
+      <button
+        type="button"
+        class="curve-toggle"
+        class:active={!!params.curves?.[key]}
+        onclick={() => toggleCurve(key)}
+      >
+        {label}
+      </button>
+      {#if params.curves?.[key]}
+        <BezierEditor
+          curve={params.curves[key]!}
+          paramMin={PARAM_META[key].min}
+          paramMax={PARAM_META[key].max}
+          onChange={(c) => setCurve(key, c)}
+        />
+      {/if}
+    </div>
+  {/each}
+</ResponsiveSection>
+```
+
+Note the `!` non-null assertion on `params.curves[key]` — the `{#if}` guard guarantees it is defined, but TypeScript doesn't narrow through Svelte template conditionals without the assertion.
+
+Note the `(key)` keyed `#each` — without it, Svelte reuses DOM nodes when the list changes, potentially reusing an old BezierEditor with stale props.
+
+### Step 3 — CSS inside `Dashboard.svelte <style>`
+
+```css
+.curve-row {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.curve-toggle {
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+  width: 100%;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.curve-toggle.active {
+  background: var(--accent);
+  color: #000;
+}
+```
+
+### Step 4 — Verify store compatibility
+
+**`updateParam('curves', newMap)`** passes through the `curves` object unchanged since `curves` is not in `NUMERIC_RANGES`. This is the correct path — the `BezierCurve` type is not a number and must not be clamped. Add a comment to the `updateParam` function in `synthParams.svelte.ts`:
+```ts
+// Non-numeric params (e.g. 'waveform', 'arpPattern', 'curves', 'arpSteps')
+// are not in NUMERIC_RANGES and fall through to the direct assignment below.
+```
+
+**`resetParams()`** calls `Object.assign(params, sanitizeParams(DEFAULT_PARAMS))`. Since `DEFAULT_PARAMS.curves = {}`, this resets all curves — correct. No changes needed.
+
+**`setParams(next)` when loading a preset** calls `Object.assign(params, sanitizeParams(next))`. The entire `curves` map is replaced by the preset's snapshot — also correct. If the preset has curves, they load. If the preset was saved before Task 24 (no `curves` field), the migration guard in Task 28 ensures `curves: {}` is present before `setParams` is called.
+
+### Step 5 — TypeScript: PARAM_META coverage check
+
+`PARAM_META[key]` is used to get `min` and `max` for the BezierEditor. Verify that all five `CurveableParam` keys (`frequency`, `lpfCutoff`, `hpfCutoff`, `vibratoDepth`, `vibratoRate`) exist in `PARAM_META`. They should — these are all numeric params with sliders. If `PARAM_META` is typed as `Partial<Record<keyof SynthParams, ...>>`, add a compile-time check:
+```ts
+// In BezierCurve.ts or Dashboard.svelte's script:
+import type { PARAM_META } from '$lib/types/paramMeta';
+type _MetaCheck = CurveableParam extends keyof typeof PARAM_META ? true : never;
+```
+
+### Unit Tests (`src/lib/components/Dashboard.test.ts`)
+
+```ts
+test('clicking a curve-toggle enables the curve for that param', async () => {
+  // render Dashboard with synthesizer mock
+  // click the PITCH toggle button
+  // assert params.curves.frequency is defined
+});
+
+test('clicking an active curve-toggle disables the curve', async () => {
+  // render Dashboard with params.curves.frequency already set
+  // click the PITCH toggle button
+  // assert params.curves.frequency is undefined
+});
+
+test('BezierEditor is rendered when curve is active, hidden when inactive', async () => {
+  // enable PITCH curve → BezierEditor canvas appears
+  // disable PITCH curve → BezierEditor canvas disappears
+});
+```
+
+---
+
+## Task 28 — Randomizer Curve Presets & Preset Compatibility
+
+**Goal:** Make the randomizer produce meaningful automation curves for sound categories where a sweep is the defining characteristic. Also add a migration guard so old presets saved before the `curves` field existed load correctly.
+
+### Understanding `withGlobalClamp` and `curves`
+
+`randomize()` calls `withGlobalClamp(output)` at the end to clamp all numeric values. `withGlobalClamp` iterates `GLOBAL_NUMERIC_RANGES`, which does not contain `curves` (it's not a numeric param). `structuredClone(params)` — used inside `withGlobalClamp` — correctly deep-clones plain objects, so any `curves` set on `output` before calling `withGlobalClamp` will survive unchanged in the returned value. Add a comment to `withGlobalClamp` confirming this:
+```ts
+// 'curves' is intentionally absent from GLOBAL_NUMERIC_RANGES.
+// structuredClone preserves it, and the for-loop skips it.
+```
+
+**Important:** Set `output.curves` inside the category `switch` block, before calling `withGlobalClamp`. The returned value from `withGlobalClamp` is what the function returns — don't set `curves` on `output` after calling it.
+
+### Step 1 — `src/lib/audio/randomizer.ts`
+
+Add imports:
+```ts
+import { logSweepCurve, sweepCurve } from '$lib/audio/bezier';
+```
+
+Inside `randomize()`, set `output.curves` at the end of each `case` block:
+
+**`shoot`** — classic retro laser: pitch drops fast from start to ~5–10% of start. Use `logSweepCurve` so the pitch drop sounds perceptually even (equal semitones per ms). Shape `0.2` makes the drop happen mostly in the first third — the snappy character of a laser shot.
+```ts
+case 'shoot':
+  // ... existing params ...
+  output.curves = {
+    frequency: logSweepCurve(
+      output.frequency,
+      output.frequency * randomBetween(0.04, 0.1),
+      0.2
+    )
+  };
+  break;
+```
+
+**`explosion`** — LPF closes as the boom decays: starts wide-open (high cutoff), closes to a low rumble. Shape `0.7` makes it stay open briefly then sweep shut. Also add an HPF sweep opening upward slightly to remove DC buildup.
+```ts
+case 'explosion':
+  // ... existing params ...
+  output.curves = {
+    lpfCutoff: sweepCurve(
+      randomBetween(1500, 4000),
+      randomBetween(60, 250),
+      0.7
+    )
+  };
+  break;
+```
+
+**`jump`** — pitch rises as the character goes up. Use `logSweepCurve` for perceptual linearity. Shape `0.6` makes the sweep ease out (fast start, gradual finish — like real jump physics).
+```ts
+case 'jump':
+  // ... existing params ...
+  output.curves = {
+    frequency: logSweepCurve(
+      output.frequency,
+      output.frequency * randomBetween(1.5, 3.0),
+      0.6
+    )
+  };
+  break;
+```
+
+**`blip`** — quick chirp: frequency drops slightly in the first 20% then holds. Use a `sweepCurve` with tight shape:
+```ts
+case 'blip':
+  // ... existing params ...
+  output.curves = {
+    frequency: logSweepCurve(
+      output.frequency,
+      output.frequency * randomBetween(0.4, 0.75),
+      0.15
+    )
+  };
+  break;
+```
+
+**`powerup`**, **`coin`**, **`hit`** — no curves. Arpeggio handles pitch for powerup/coin; hit is a noise burst with the character defined entirely by its envelope and filter. Explicitly set `output.curves = {}` to make intent clear:
+```ts
+case 'powerup':
+case 'coin':
+case 'hit':
+  // ... existing params ...
+  output.curves = {}; // arpeggio / envelope already defines the character
+  break;
+```
+
+### Step 2 — `src/lib/stores/presets.svelte.ts` — migration guard
+
+Presets saved before Task 24 don't have a `curves` field in their serialised `params`. When such a preset is loaded, `setParams(loaded.params)` runs `Object.assign(params, sanitizeParams(loaded.params))`, which would set `params.curves` to `undefined` (since the field is absent in the loaded object and the spread in `Object.assign` passes it through as missing). This breaks the TypeScript invariant that `curves` is always `Partial<Record<...>>`, not `undefined`.
+
+Apply the guard immediately after parsing — before passing the params to `setParams`:
+
+```ts
+// In the function that reads presets from localStorage and returns SynthParams:
+function migrateParams(raw: unknown): SynthParams {
+  const p = raw as SynthParams;
+  // Task 24 added `curves`. Guard against presets saved before this field existed.
+  if (!p.curves || typeof p.curves !== 'object' || Array.isArray(p.curves)) {
+    p.curves = {};
+  }
+  return p;
+}
+```
+
+Call `migrateParams` on the deserialized params object before using it:
+```ts
+const stored = JSON.parse(raw) as { id: string; name: string; params: unknown; createdAt: number };
+const params = migrateParams(stored.params);
+```
+
+The check `typeof p.curves !== 'object' || Array.isArray(p.curves)` also guards against malformed localStorage values (e.g. `curves: null` or `curves: []` from a corruption).
+
+### Step 3 — Verify `GLOBAL_NUMERIC_RANGES` in randomizer
+
+`GLOBAL_NUMERIC_RANGES` must not contain a `curves` entry (it would be treated as a number range and break `withGlobalClamp`). Confirm this is the case — it should be, since `curves` was never added there. Add a comment next to the constant:
+```ts
+// Note: 'curves' is intentionally absent — it is not a numeric param.
+// 'arpSteps' and 'arpPattern' are also absent for the same reason.
+const GLOBAL_NUMERIC_RANGES: Record<string, Range> = { ... };
+```
+
+### Unit Tests (`src/lib/audio/randomizer.test.ts`)
+
+```ts
+describe('curves in randomize()', () => {
+  test('shoot: curves.frequency is defined and sweeps downward', () => {
+    const r = randomize('shoot');
+    expect(r.curves.frequency).toBeDefined();
+    expect(r.curves.frequency!.p3.y).toBeLessThan(r.curves.frequency!.p0.y);
+  });
+
+  test('jump: curves.frequency sweeps upward', () => {
+    const r = randomize('jump');
+    expect(r.curves.frequency).toBeDefined();
+    expect(r.curves.frequency!.p3.y).toBeGreaterThan(r.curves.frequency!.p0.y);
+  });
+
+  test('explosion: curves.lpfCutoff defined, frequency undefined', () => {
+    const r = randomize('explosion');
+    expect(r.curves.lpfCutoff).toBeDefined();
+    expect(r.curves.frequency).toBeUndefined();
+  });
+
+  test('blip: curves.frequency drops to less than 80% of start', () => {
+    const r = randomize('blip');
+    expect(r.curves.frequency).toBeDefined();
+    expect(r.curves.frequency!.p3.y).toBeLessThan(r.curves.frequency!.p0.y * 0.8);
+  });
+
+  test('coin: curves is empty object', () => {
+    expect(randomize('coin').curves).toEqual({});
+  });
+
+  test('powerup: curves is empty object', () => {
+    expect(randomize('powerup').curves).toEqual({});
+  });
+
+  test('hit: curves is empty object', () => {
+    expect(randomize('hit').curves).toEqual({});
+  });
+
+  test('withGlobalClamp does not destroy curves', () => {
+    // Run randomize 10 times and verify curves survive the clamp pass
+    for (let i = 0; i < 10; i++) {
+      const r = randomize('shoot');
+      expect(r.curves.frequency).toBeDefined();
+      expect(typeof r.curves.frequency!.p0.y).toBe('number');
+    }
+  });
+});
+```
+
+Add a separate migration test in `src/lib/stores/presets.test.ts`:
+```ts
+test('migrateParams adds curves: {} when curves field is absent', () => {
+  const old = { waveform: 'square', frequency: 440, /* ... other fields ... */ };
+  // Should not throw and should add curves
+  const migrated = migrateParams(old);
+  expect(migrated.curves).toEqual({});
+});
+
+test('migrateParams preserves existing curves', () => {
+  const withCurves = { ...DEFAULT_PARAMS, curves: { frequency: flatCurve(440) } };
+  const migrated = migrateParams(withCurves);
+  expect(migrated.curves.frequency).toBeDefined();
+});
+```
+
+---

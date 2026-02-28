@@ -1,5 +1,6 @@
 export type Waveform = 'square' | 'sawtooth' | 'sine' | 'noise';
 export type ArpPattern = 'up' | 'down' | 'random';
+import type { BezierCurve, CurveableParam } from './BezierCurve';
 
 export interface SynthParams {
 	waveform: Waveform;
@@ -28,6 +29,8 @@ export interface SynthParams {
 	retriggerRate: number;
 	retriggerCount: number;
 	duration: number;
+	/** Active automation curves keyed by automatable parameter. */
+	curves: Partial<Record<CurveableParam, BezierCurve>>;
 }
 
 export const DEFAULT_PARAMS: SynthParams = {
@@ -56,5 +59,6 @@ export const DEFAULT_PARAMS: SynthParams = {
 	sampleRateReduction: 1,
 	retriggerRate: 0,
 	retriggerCount: 0,
-	duration: 300
+	duration: 300,
+	curves: {}
 };
