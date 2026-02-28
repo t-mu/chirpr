@@ -161,15 +161,20 @@ describe('Dashboard', () => {
 	});
 
 	it('renders split effects sections and hides legacy section titles', async () => {
-		const { findByRole, getByText, queryByText } = render(Dashboard);
+		const { container, findByRole, getByText, queryByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });
 
 		expect(getByText('FILTERS')).toBeTruthy();
 		expect(getByText('MODULATION')).toBeTruthy();
 		expect(getByText('FLANGER')).toBeTruthy();
 		expect(getByText('BIT CRUSHER')).toBeTruthy();
+		expect(getByText('OSCILLOSCOPE')).toBeTruthy();
 		expect(queryByText('EFFECTS')).toBeNull();
 		expect(queryByText('DUTY CYCLE')).toBeNull();
+		const sectionTitles = Array.from(container.querySelectorAll('summary h2')).map((node) =>
+			node.textContent?.trim()
+		);
+		expect(sectionTitles).not.toContain('OSCILLOSCOPE');
 	});
 
 	it('shows retrigger slider', async () => {

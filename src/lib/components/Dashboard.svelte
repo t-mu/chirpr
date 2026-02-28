@@ -233,11 +233,15 @@
 	<div class="layout">
 		<div class="left-column">
 			<ResponsiveSection title="OSCILLATOR" open={true}>
-				<PixelToggle
-					options={waveformOptions}
-					selected={params.waveform}
-					onChange={(value) => void applyParam('waveform', value as WaveformType)}
-				/>
+				<div class="osc-preview">
+					<p class="osc-preview__label">OSCILLOSCOPE</p>
+					<PixelToggle
+						options={waveformOptions}
+						selected={params.waveform}
+						onChange={(value) => void applyParam('waveform', value as WaveformType)}
+					/>
+					<Oscilloscope waveform={waveformSource} />
+				</div>
 				{#each OSCILLATOR_SLIDERS as slider (slider.key)}
 					<ParamSlider
 						paramKey={slider.key}
@@ -344,10 +348,6 @@
 		</div>
 
 		<div class="right-column">
-			<ResponsiveSection title="OSCILLOSCOPE" open={true}>
-				<Oscilloscope waveform={waveformSource} />
-			</ResponsiveSection>
-
 			{#each PLAYBACK_SLIDERS as slider (slider.key)}
 				<ParamSlider
 					paramKey={slider.key}
@@ -433,6 +433,18 @@
 		margin: 0;
 		font-size: 0.52rem;
 		color: var(--yellow);
+	}
+
+	.osc-preview {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.osc-preview__label {
+		margin: 0;
+		font-size: 0.65rem;
+		color: var(--accent);
+		letter-spacing: 0.05em;
 	}
 
 	.audio-hint {
