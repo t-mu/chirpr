@@ -348,27 +348,28 @@
 		</div>
 
 		<div class="right-column">
-			{#each PLAYBACK_SLIDERS as slider (slider.key)}
-				<ParamSlider
-					paramKey={slider.key}
-					label={slider.label}
-					value={params[slider.key]}
-					onChange={(value) => onSliderValueChange(slider.key, value)}
-					onDragStart={onSliderDragStart}
-					onDragEnd={onSliderDragEnd}
-				/>
-			{/each}
-
-			<button class="play-button" type="button" onclick={() => void togglePlay()}>
-				{isPlaying ? '■ STOP' : '▶ PLAY'}
-			</button>
-			{#if !audioReady && audioInitAttempted}
-				<p class="audio-hint">AUDIO ENABLES ON FIRST INTERACTION</p>
-			{/if}
+			<ResponsiveSection title="EXPORT" open={true}>
+				{#each PLAYBACK_SLIDERS as slider (slider.key)}
+					<ParamSlider
+						paramKey={slider.key}
+						label={slider.label}
+						value={params[slider.key]}
+						onChange={(value) => onSliderValueChange(slider.key, value)}
+						onDragStart={onSliderDragStart}
+						onDragEnd={onSliderDragEnd}
+					/>
+				{/each}
+				<button class="play-button" type="button" onclick={() => void togglePlay()}>
+					{isPlaying ? '■ STOP' : '▶ PLAY'}
+				</button>
+				{#if !audioReady && audioInitAttempted}
+					<p class="audio-hint">AUDIO ENABLES ON FIRST INTERACTION</p>
+				{/if}
+				<ExportPanel />
+			</ResponsiveSection>
 
 			<PresetPanel {synthesizer} />
 			<RandomizerPanel onRandomize={(category) => void applyRandomCategory(category)} />
-			<ExportPanel />
 		</div>
 	</div>
 </main>

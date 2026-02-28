@@ -37,19 +37,19 @@ describe('ExportPanel', () => {
 
 		updateParam('duration', 650);
 		await fireEvent.change(formatSelect, { target: { value: 'mp3' } });
-		await fireEvent.click(getByRole('button', { name: 'EXPORT' }));
+		await fireEvent.click(getByRole('button', { name: 'SAVE' }));
 
 		expect(renderToBuffer).toHaveBeenCalledWith(expect.anything(), 0.65);
 		expect(exportMP3).toHaveBeenCalledTimes(1);
 		expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'sfx.mp3');
-		expect(await findByText('DOWNLOADED!')).toBeTruthy();
+		expect(await findByText('SAVED!')).toBeTruthy();
 	});
 
 	it('shows failure flash message when rendering fails', async () => {
 		renderToBuffer.mockRejectedValueOnce(new Error('offline render failed'));
 		const { getByRole, findByText } = render(ExportPanel);
 
-		await fireEvent.click(getByRole('button', { name: 'EXPORT' }));
+		await fireEvent.click(getByRole('button', { name: 'SAVE' }));
 
 		expect(downloadBlob).not.toHaveBeenCalled();
 		expect(await findByText('EXPORT FAILED')).toBeTruthy();

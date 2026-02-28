@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import { params } from '$lib/stores/synthParams.svelte';
-	import PanelCard from '$lib/components/PanelCard.svelte';
 	import {
 		downloadBlob,
 		exportMP3,
@@ -24,31 +22,29 @@
 		ogg: exportOGG
 	};
 
+	$effect(() => {
+		return () => {
+			if (flashTimeout !== undefined) clearTimeout(flashTimeout);
+		};
+	});
+
 	function showFlash(message: string): void {
 		flashMessage = message;
-		if (flashTimeout !== undefined) {
-			clearTimeout(flashTimeout);
-		}
+		if (flashTimeout !== undefined) clearTimeout(flashTimeout);
 		flashTimeout = window.setTimeout(() => {
 			flashMessage = '';
 		}, 1000);
 	}
 
-	onDestroy(() => {
-		if (flashTimeout !== undefined) {
-			clearTimeout(flashTimeout);
-		}
-	});
-
 	async function handleExport(): Promise<void> {
+		if (isExporting) return;
 		isExporting = true;
 		flashMessage = '';
 		try {
-			const exportDurationSeconds = params.duration / 1000;
-			const buffer = await renderToBuffer(params, exportDurationSeconds);
+			const buffer = await renderToBuffer(params, params.duration / 1000);
 			const blob = await exporters[format](buffer);
 			downloadBlob(blob, `sfx.${format}`);
-			showFlash('DOWNLOADED!');
+			showFlash('SAVED!');
 		} catch {
 			showFlash('EXPORT FAILED');
 		} finally {
@@ -57,45 +53,35 @@
 	}
 </script>
 
-<PanelCard title="EXPORT">
-	<div class="controls">
-		<label>
-			Format
-			<select bind:value={format}>
-				<option value="wav">WAV</option>
-				<option value="mp3">MP3</option>
-				<option value="ogg">OGG</option>
-			</select>
-		</label>
-	</div>
-	<button
-		type="button"
-		class="export-button"
-		onclick={() => void handleExport()}
-		disabled={isExporting}
-	>
-		{isExporting ? 'EXPORTING...' : 'EXPORT'}
-	</button>
-	{#if flashMessage}
-		<p>{flashMessage}</p>
-	{/if}
-</PanelCard>
+<label class="format-label">
+	Format
+	<select bind:value={format}>
+		<option value="wav">WAV</option>
+		<option value="mp3">MP3</option>
+		<option value="ogg">OGG</option>
+	</select>
+</label>
+<button
+	type="button"
+	class="save-button"
+	onclick={() => void handleExport()}
+	disabled={isExporting}
+>
+	{isExporting ? 'SAVING...' : 'SAVE'}
+</button>
+{#if flashMessage}
+	<p class="flash">{flashMessage}</p>
+{/if}
 
 <style>
-	.controls {
-		display: grid;
-		grid-template-columns: 1fr;
-		gap: 0.4rem;
-	}
-
-	label {
+	.format-label {
 		display: grid;
 		gap: 0.25rem;
 		font-size: 0.55rem;
 	}
 
 	select,
-	button {
+	.save-button {
 		font: inherit;
 		font-size: 0.58rem;
 		padding: 0.45rem;
@@ -104,11 +90,11 @@
 		color: inherit;
 	}
 
-	.export-button {
+	.save-button {
 		background: transparent;
 	}
 
-	p {
+	.flash {
 		margin: 0;
 		font-size: 0.6rem;
 		color: var(--yellow);
