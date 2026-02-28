@@ -2318,3 +2318,411 @@ test('migrateParams preserves existing curves', () => {
 ```
 
 ---
+
+## ~~Task 29 — Fix Flanger: `chorus.start()` Never Called (regression from Task 14)~~ ✅ DONE
+
+**Goal:** The `Tone.Chorus` node requires an explicit `.start()` call to activate its internal LFO. Without it the chorus/flanger effect is completely silent regardless of the wet, depth, and rate settings. Task 14 was marked ✅ DONE but the `.start()` call was never added to the implementation.
+
+### Root Cause
+
+`src/lib/audio/synthesizer.ts:rewireVoice()` wires the audio chain but never calls `this.chorus.start()`:
+
+```ts
+private rewireVoice(): void {
+  this.voice.connect(this.bitCrusherNode);
+  this.bitCrusherNode.connect(this.vibrato);
+  this.vibrato.connect(this.chorus);
+  this.chorus.connect(this.lpf);
+  // ← this.chorus.start() is missing here
+  this.lpf.connect(this.hpf);
+  this.hpf.connect(this.waveform);
+  this.hpf.connect(Tone.getDestination());
+}
+```
+
+`Tone.Chorus` extends `LFOEffect`. The LFO that modulates the delay time is not running until `.start()` is called. Audio passes through the node but since the LFO is not oscillating the delay time is constant — producing no audible chorus/flanging.
+
+### Steps
+
+1. **`src/lib/audio/synthesizer.ts`** — in `rewireVoice()`, add `this.chorus.start()` immediately after the chain is wired:
+
+   ```ts
+   private rewireVoice(): void {
+     this.voice.connect(this.bitCrusherNode);
+     this.bitCrusherNode.connect(this.vibrato);
+     this.vibrato.connect(this.chorus);
+     this.chorus.connect(this.lpf);
+     this.chorus.start(); // ← activate the internal LFO
+     this.lpf.connect(this.hpf);
+     this.hpf.connect(this.waveform);
+     this.hpf.connect(Tone.getDestination());
+   }
+   ```
+
+   `rewireVoice()` is called once from the constructor, so the LFO starts once and runs for the lifetime of the Synthesizer instance. Do NOT call `chorus.start()` from `updateParams` or `applyParams` — it would restart the LFO phase on every param update.
+
+2. Verify `dispose()` already calls `this.chorus.dispose()` — it does, so no change is needed there.
+
+### How to Verify
+
+Set `flangerRate: 5`, `flangerDepth: 0.5`, `flangerWet: 0.6` on a sawtooth wave and press play. You should hear a clear chorusing/flanging effect (pitch shimmer, detuned doubling). Without the fix the output is identical to `flangerWet: 0` regardless of the other settings.
+
+### Unit Tests
+
+- **`synthesizer.test.ts`**: After `Synthesizer.create()`, spy on the Tone.Chorus mock and assert `.start()` was called exactly once.
+
+---
+
+## Task 30 — Fix Retrigger: `retriggerCount` Gate Still Active (regression from Task 15)
+
+**Goal:** Task 15 was supposed to remove the `retriggerCount` field entirely and simplify the retrigger gate to `retriggerRate > 0`. It was marked ✅ DONE but none of the changes were applied. The retrigger effect remains permanently disabled because `retriggerCount` defaults to 0 and has no UI.
+
+### Root Cause Across Files
+
+All of the following are unchanged from before Task 15:
+
+| File | Line | Problem |
+|------|------|---------|
+| `src/lib/audio/synthesizer.ts` | ~27 | `isRetriggerEnabled` checks `params.retriggerCount > 0` |
+| `src/lib/audio/synthesizer.ts` | ~179 | `updateParams` sets `merged.retriggerCount = 0` |
+| `src/lib/types/SynthParams.ts` | ~30 | `retriggerCount: number` still in interface |
+| `src/lib/types/SynthParams.ts` | ~61 | `retriggerCount: 0` still in `DEFAULT_PARAMS` |
+| `src/lib/types/paramMeta.ts` | ~45 | `retriggerCount` has a PARAM_META entry |
+| `src/lib/audio/randomizer.ts` | ~33 | `retriggerCount` in `GLOBAL_NUMERIC_RANGES` |
+
+### Steps
+
+1. **`src/lib/types/SynthParams.ts`**
+
+   Remove `retriggerCount` from the interface and default:
+   ```ts
+   // Delete from SynthParams interface:
+   retriggerCount: number;
+
+   // Delete from DEFAULT_PARAMS:
+   retriggerCount: 0,
+   ```
+
+2. **`src/lib/types/paramMeta.ts`**
+
+   Delete the entry:
+   ```ts
+   // Delete this line:
+   retriggerCount: { min: 0, max: 16, step: 1, section: 'retrigger' },
+   ```
+   After removal, the `satisfies Record<NumericSynthParamKey, ParamMeta>` constraint still holds because `retriggerCount` will no longer be a key of `SynthParams`.
+
+3. **`src/lib/audio/synthesizer.ts`**
+
+   a. Simplify the gate (line ~27):
+   ```ts
+   // Before:
+   const isRetriggerEnabled = (params: SynthParams): boolean =>
+     params.retriggerRate > 0 && params.retriggerCount > 0;
+
+   // After:
+   const isRetriggerEnabled = (params: SynthParams): boolean =>
+     params.retriggerRate > 0;
+   ```
+
+   b. In `updateParams`, remove the dead assignment from the arpeggio conflict guard (line ~177–183):
+   ```ts
+   if (isArpeggioEnabled(merged)) {
+     merged.retriggerRate = 0;
+     // Delete: merged.retriggerCount = 0;
+   }
+   ```
+
+4. **`src/lib/audio/randomizer.ts`**
+
+   Delete the range entry (line ~33):
+   ```ts
+   // Delete:
+   retriggerCount: { min: 0, max: 16 },
+   ```
+
+5. **Search for remaining references**:
+   ```bash
+   grep -r "retriggerCount" src/
+   ```
+   Remove from any test fixtures that include `retriggerCount` as a field (e.g. test helper objects that spread `DEFAULT_PARAMS` and add extra fields).
+
+### How to Verify
+
+Set `retriggerRate` slider to any value above 0 and press play. The sound should stutter/retrigger at that rate. This was previously impossible because `retriggerCount` defaulted to 0, keeping `isRetriggerEnabled` permanently false.
+
+### Unit Tests
+
+- **`synthesizer.test.ts`**: `updateParams({ retriggerRate: 5 })` → calling `play()` starts the retrigger loop.
+- **`synthParams.test.ts`**: `DEFAULT_PARAMS` no longer has a `retriggerCount` key.
+- **`paramMeta.test.ts`**: `assertParamMetaCoverage(DEFAULT_PARAMS)` still passes after removal.
+
+---
+
+## Task 31 — Fix `logSweepCurve`: Symmetric Plateau Instead of Smooth Log Sweep
+
+**Goal:** `logSweepCurve` in `src/lib/audio/bezier.ts` is supposed to produce a perceptually linear pitch sweep (equal semitones per millisecond). The current implementation places **both** control points at the same geometric-mean y-value, which creates an audible flat section around that midpoint for ~60% of the duration rather than a smooth continuous sweep.
+
+### Root Cause
+
+```ts
+// bezier.ts — current implementation:
+const midValue = Math.exp((logStart + logEnd) / 2); // single geometric mean
+
+return {
+  p0: { x: 0,              y: safeStart },
+  p1: { x: clampedShape,   y: midValue  }, // ← both handles share the same y
+  p2: { x: 1-clampedShape, y: midValue  }, // ← creating a plateau
+  p3: { x: 1,              y: safeEnd   },
+};
+```
+
+**Worked example — shoot sound (shape=0.2, start=1200 Hz, end=48 Hz):**
+- `midValue = sqrt(1200 × 48) ≈ 240 Hz`
+- `p1 = {x:0.2, y:240}`, `p2 = {x:0.8, y:240}`
+- The bezier is pulled toward 240 Hz between t≈0.1 and t≈0.9 — a plateau spanning 80% of playback
+- **Audible result:** two distinct steps (1200 → 240 → 48) instead of a smooth sweep
+
+### Fix
+
+Compute the two control point y-values at **different** positions along the log interpolation so they bracket different parts of the sweep instead of both targeting the midpoint:
+
+```ts
+// Each handle is placed at a different fraction of the log-space path:
+//   p1 at 'shape' fraction (near the start for small shape values)
+//   p2 at '1 - shape' fraction (near the end)
+const logP1y = logStart + (logEnd - logStart) * clampedShape;
+const logP2y = logStart + (logEnd - logStart) * (1 - clampedShape);
+
+return {
+  p0: { x: 0,              y: safeStart          },
+  p1: { x: clampedShape,   y: Math.exp(logP1y)   },
+  p2: { x: 1-clampedShape, y: Math.exp(logP2y)   },
+  p3: { x: 1,              y: safeEnd             },
+};
+```
+
+**Worked example with fix — shoot (shape=0.2):**
+- `logP1y` at 20% of log path → `p1.y ≈ 630 Hz` (still high, near the start)
+- `logP2y` at 80% of log path → `p2.y ≈ 91 Hz` (already low, near the end)
+- The bezier descends continuously from 1200 Hz: fast initial drop (pulled toward 630 at x=0.2), then smoothly to 48 Hz
+
+**Backward compatibility:** When `shape = 0.5`, `logP1y = logP2y = (logStart + logEnd)/2` — identical to the old behavior. Only shapes other than 0.5 (all current randomizer calls use 0.15–0.6) benefit from the fix.
+
+### Steps
+
+1. **`src/lib/audio/bezier.ts`** — replace the body of `logSweepCurve`:
+
+   ```ts
+   export function logSweepCurve(startHz: number, endHz: number, shape = 0.5): BezierCurve {
+     const safeStart = Math.max(1, startHz);
+     const safeEnd   = Math.max(1, endHz);
+     const logStart  = Math.log(safeStart);
+     const logEnd    = Math.log(safeEnd);
+     const clampedShape = Math.max(0, Math.min(1, shape));
+
+     // Interpolate control-point y-values separately in log space so they
+     // bracket distinct sections of the sweep instead of both hitting the midpoint.
+     const logP1y = logStart + (logEnd - logStart) * clampedShape;
+     const logP2y = logStart + (logEnd - logStart) * (1 - clampedShape);
+
+     return {
+       p0: { x: 0,              y: safeStart          },
+       p1: { x: clampedShape,   y: Math.exp(logP1y)   },
+       p2: { x: 1-clampedShape, y: Math.exp(logP2y)   },
+       p3: { x: 1,              y: safeEnd             },
+     };
+   }
+   ```
+
+2. No other files need changing — the function signature is unchanged.
+
+### How to Verify
+
+- Randomize a **shoot** sound and listen to the pitch automation curve. You should hear a clean, smooth laser-downward sweep that decelerates naturally, not a two-step plateau drop.
+- Open the BezierEditor for the frequency curve — the bezier should show a smooth monotonic arc with no flat middle section.
+- Randomize a **blip** sound — the downward frequency curve should sound like a short clean chirp.
+
+### Unit Tests (`src/lib/audio/bezier.test.ts`)
+
+```ts
+describe('logSweepCurve', () => {
+  test('p0.y = startHz, p3.y = endHz', () => {
+    const c = logSweepCurve(1200, 48, 0.2);
+    expect(c.p0.y).toBeCloseTo(1200);
+    expect(c.p3.y).toBeCloseTo(48);
+  });
+
+  test('downward sweep with shape≠0.5: p1.y > p2.y (no plateau)', () => {
+    const c = logSweepCurve(1200, 48, 0.2);
+    expect(c.p1.y).toBeGreaterThan(c.p2.y);
+    // p1 stays high (near start), p2 is already low (near end)
+    expect(c.p1.y).toBeGreaterThan(400); // still high (was 630 in example)
+    expect(c.p2.y).toBeLessThan(200);    // already low (was 91 in example)
+  });
+
+  test('upward sweep: p1.y < p2.y', () => {
+    const c = logSweepCurve(500, 1500, 0.3);
+    expect(c.p1.y).toBeLessThan(c.p2.y);
+  });
+
+  test('shape=0.5: both handles at geometric mean (backward compat)', () => {
+    const c = logSweepCurve(1200, 48, 0.5);
+    const geoMean = Math.sqrt(1200 * 48);
+    expect(c.p1.y).toBeCloseTo(geoMean, 0);
+    expect(c.p2.y).toBeCloseTo(geoMean, 0);
+  });
+
+  test('handles endHz < 1 without NaN (clamped to 1)', () => {
+    expect(() => logSweepCurve(1000, 0)).not.toThrow();
+    const c = logSweepCurve(1000, 0);
+    expect(Number.isFinite(c.p1.y)).toBe(true);
+    expect(Number.isFinite(c.p2.y)).toBe(true);
+    expect(c.p3.y).toBeCloseTo(1);
+  });
+});
+```
+
+Update any existing test that asserts the old behavior `p1.y === p2.y === midValue` for non-0.5 shapes.
+
+---
+
+## Task 32 — Vibrato Automation Curves Silently Discarded in Exported Audio
+
+**Goal:** `CurveableParam` includes `'vibratoDepth'` and `'vibratoRate'`, and the AUTOMATION section lets users draw bezier curves for them. But the offline exporter (`src/lib/audio/exporter.ts`) has no vibrato node — so vibrato curves play in real-time but are **silently ignored** in exported WAV/MP3/OGG files. Users hear one thing and export another.
+
+### Root Cause
+
+The live synthesizer chain: voice → BitCrusher → **Vibrato** → Chorus → LPF → HPF → destination
+
+The offline exporter chain: source → BitCrusher → LPF → HPF → envelope gain → destination
+
+The vibrato node is absent from the exporter. `exporter.ts` only schedules curves for `frequency`, `lpfCutoff`, and `hpfCutoff` — which do have offline equivalents. `vibratoDepth`/`vibratoRate` curves are read from `params.curves` but never applied.
+
+### Recommended Fix: Remove Vibrato Params from `CurveableParam` (Option A)
+
+Adding a vibrato LFO to the offline chain would require a `ScriptProcessorNode` or manual delay-buffer LFO simulation — significant complexity. The simpler and more honest fix is to only expose params as curveable if both the real-time synth and the exporter can apply them.
+
+### Steps
+
+1. **`src/lib/types/BezierCurve.ts`** — remove the two vibrato keys from the union:
+
+   ```ts
+   // Before:
+   export type CurveableParam =
+     | 'frequency'
+     | 'lpfCutoff'
+     | 'hpfCutoff'
+     | 'vibratoDepth'
+     | 'vibratoRate';
+
+   // After:
+   export type CurveableParam =
+     | 'frequency'
+     | 'lpfCutoff'
+     | 'hpfCutoff';
+   ```
+
+   The compile-time check `CurveableParam extends keyof SynthParams` still passes — all three remaining keys exist in `SynthParams`.
+
+2. **`src/lib/components/Dashboard.svelte`** — remove the two vibrato entries from `CURVEABLE_PARAMS`:
+
+   ```ts
+   // Before:
+   const CURVEABLE_PARAMS: Array<{ key: CurveableParam; label: string }> = [
+     { key: 'frequency',    label: 'PITCH'      },
+     { key: 'lpfCutoff',   label: 'LPF CUTOFF' },
+     { key: 'hpfCutoff',   label: 'HPF CUTOFF' },
+     { key: 'vibratoDepth', label: 'VIB DEPTH' },
+     { key: 'vibratoRate',  label: 'VIB RATE'  },
+   ];
+
+   // After:
+   const CURVEABLE_PARAMS: Array<{ key: CurveableParam; label: string }> = [
+     { key: 'frequency',  label: 'PITCH'      },
+     { key: 'lpfCutoff', label: 'LPF CUTOFF' },
+     { key: 'hpfCutoff', label: 'HPF CUTOFF' },
+   ];
+   ```
+
+   TypeScript will enforce this — `'vibratoDepth'` and `'vibratoRate'` are no longer assignable to `CurveableParam` and will cause a compile error if left in the array.
+
+3. **`src/lib/audio/synthesizer.ts`** — remove the two vibrato curve blocks and simplify `restoreStaticParams`:
+
+   In `applyCurves`, delete:
+   ```ts
+   if (curves.vibratoDepth) {
+     const samples = toCurveValues(sampleCurve(curves.vibratoDepth, sampleCount));
+     this.vibrato.depth.cancelScheduledValues(now);
+     this.vibrato.depth.setValueCurveAtTime(samples, now, durationSec);
+   }
+   if (curves.vibratoRate) {
+     const samples = toCurveValues(sampleCurve(curves.vibratoRate, sampleCount));
+     this.vibrato.frequency.cancelScheduledValues(now);
+     this.vibrato.frequency.setValueCurveAtTime(samples, now, durationSec);
+   }
+   ```
+
+   In `cancelCurveAutomation`, delete:
+   ```ts
+   this.vibrato.depth.cancelScheduledValues(now);
+   this.vibrato.frequency.cancelScheduledValues(now);
+   ```
+
+   In `restoreStaticParams`, replace the two guarded blocks with unconditional assignments (vibrato is now always static):
+   ```ts
+   // Replace:
+   if (!curves.vibratoDepth) {
+     this.vibrato.depth.cancelScheduledValues(now);
+     this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
+   }
+   if (!curves.vibratoRate) {
+     this.vibrato.frequency.cancelScheduledValues(now);
+     this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
+   }
+
+   // With:
+   this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
+   this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
+   ```
+
+4. **`src/lib/stores/presets.svelte.ts`** — extend `migrateParams` to strip stale vibrato curve keys from old presets:
+
+   ```ts
+   export function migrateParams(raw: unknown): SynthParams {
+     const merged = {
+       ...DEFAULT_PARAMS,
+       ...(typeof raw === 'object' && raw !== null ? (raw as Partial<SynthParams>) : {})
+     } as SynthParams;
+
+     if (!merged.curves || typeof merged.curves !== 'object' || Array.isArray(merged.curves)) {
+       merged.curves = {};
+     }
+
+     // Strip curve keys no longer in CurveableParam (e.g. vibratoDepth, vibratoRate
+     // were removed in Task 32 because the exporter cannot apply them).
+     const VALID_CURVE_KEYS: readonly string[] = ['frequency', 'lpfCutoff', 'hpfCutoff'];
+     for (const key of Object.keys(merged.curves)) {
+       if (!VALID_CURVE_KEYS.includes(key)) {
+         delete (merged.curves as Record<string, unknown>)[key];
+       }
+     }
+
+     return merged;
+   }
+   ```
+
+5. Run `npm run check` — TypeScript will catch any remaining `'vibratoDepth'`/`'vibratoRate'` references used as `CurveableParam` values.
+
+### How to Verify
+
+- AUTOMATION section now shows only three buttons: PITCH, LPF CUTOFF, HPF CUTOFF.
+- Export a sound with a PITCH curve — the exported audio has the same pitch sweep as real-time playback.
+- Load an old preset that had `curves.vibratoDepth` set — it loads without error and the key is silently stripped.
+
+### Unit Tests
+
+- **`presets.test.ts`**: `migrateParams({ ...DEFAULT_PARAMS, curves: { vibratoDepth: flatCurve(0) } })` returns params where `curves.vibratoDepth` is `undefined`.
+- **`synthesizer.test.ts`**: After the change, `applyCurves` with a mocked params object that has `vibratoDepth` in curves (type-cast to bypass TS) does not call `vibrato.depth.setValueCurveAtTime`.
+
+---

@@ -27,6 +27,7 @@ const state = vi.hoisted(() => {
 	}> = [];
 	const patternInstances: Array<{ stop: ReturnType<typeof vi.fn> }> = [];
 	const loopInstances: Array<{ tick: (time?: number) => void }> = [];
+	const chorusInstances: Array<{ start: ReturnType<typeof vi.fn> }> = [];
 	const transport = {
 		start: vi.fn(),
 		stop: vi.fn(),
@@ -48,6 +49,7 @@ const state = vi.hoisted(() => {
 		filterInstances,
 		patternInstances,
 		loopInstances,
+		chorusInstances,
 		transport,
 		bitCrusher
 	};
@@ -145,8 +147,13 @@ vi.mock('tone', () => {
 		public depth = 0;
 		public feedback = { value: 0 };
 		public wet = { value: 0 };
+		public start = vi.fn();
 		public connect = vi.fn();
 		public dispose = vi.fn();
+
+		constructor() {
+			state.chorusInstances.push(this);
+		}
 	}
 
 	class MockFilter {
@@ -207,6 +214,7 @@ describe('synthesizer', () => {
 		state.filterInstances.length = 0;
 		state.patternInstances.length = 0;
 		state.loopInstances.length = 0;
+		state.chorusInstances.length = 0;
 		state.transport.start.mockClear();
 		state.transport.stop.mockClear();
 		state.transport.cancel.mockClear();
@@ -227,6 +235,11 @@ describe('synthesizer', () => {
 
 		expect(firstSynth.dispose).toHaveBeenCalledOnce();
 		expect(state.noiseSynthInstances.length).toBe(1);
+	});
+
+	it('starts chorus LFO once during synthesizer setup', async () => {
+		await createSynthesizer();
+		expect(state.chorusInstances[0].start).toHaveBeenCalledTimes(1);
 	});
 
 	it('switches back to Synth and disposes existing NoiseSynth', async () => {

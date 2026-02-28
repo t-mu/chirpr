@@ -230,6 +230,7 @@ class Synthesizer implements SynthesizerAPI {
 		this.bitCrusherNode.connect(this.vibrato);
 		this.vibrato.connect(this.chorus);
 		this.chorus.connect(this.lpf);
+		this.chorus.start();
 		this.lpf.connect(this.hpf);
 		this.hpf.connect(this.waveform);
 		this.hpf.connect(Tone.getDestination());
