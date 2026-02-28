@@ -1390,7 +1390,7 @@ describe('sampleCurve', () => {
 
 ---
 
-## Task 25 — BezierEditor Canvas Component
+## ~~Task 25 — BezierEditor Canvas Component~~ ✅ DONE
 
 **Goal:** Build the interactive canvas widget that lets the user see and drag a bezier curve. It is a completely self-contained display+input component — no Tone.js, no store, no audio imports.
 
