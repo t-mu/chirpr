@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SynthesizerAPI } from '$lib/audio/synthesizer';
+	import PanelCard from '$lib/components/PanelCard.svelte';
 	import {
 		deletePreset,
 		loadPreset,
@@ -71,21 +72,23 @@
 	}
 </script>
 
-<section class="panel">
-	<div class="panel__header">
-		<h3>PRESETS</h3>
-		<div class="panel__save-row">
-			<input
-				placeholder="Preset name"
-				aria-label="Preset name"
-				bind:value={presetName}
-				onkeydown={(event) => {
-					if (event.key === 'Enter') handleSave();
-				}}
-			/>
-			<button type="button" onclick={handleSave}>Save</button>
+<PanelCard>
+	{#snippet header()}
+		<div class="panel__header">
+			<h3>PRESETS</h3>
+			<div class="panel__save-row">
+				<input
+					placeholder="Preset name"
+					aria-label="Preset name"
+					bind:value={presetName}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') handleSave();
+					}}
+				/>
+				<button type="button" onclick={handleSave}>Save</button>
+			</div>
 		</div>
-	</div>
+	{/snippet}
 
 	{#if presets.length === 0}
 		<p class="empty">NO PRESETS SAVED</p>
@@ -139,21 +142,12 @@
 			</div>
 		</div>
 	{/if}
-</section>
+</PanelCard>
 
 <style>
-	.panel {
-		position: relative;
-		border: 2px solid var(--accent);
-		background: var(--surface);
-		padding: 0.75rem;
+	.panel__header {
 		display: grid;
 		gap: 0.6rem;
-	}
-
-	h3 {
-		margin: 0;
-		font-size: 0.7rem;
 	}
 
 	.panel__save-row {

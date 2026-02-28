@@ -12,6 +12,7 @@
 	import PresetPanel from '$lib/components/PresetPanel.svelte';
 	import RandomizerPanel from '$lib/components/RandomizerPanel.svelte';
 	import ExportPanel from '$lib/components/ExportPanel.svelte';
+	import { APP_REPOSITORY_URL } from '$lib/config/app';
 	import {
 		DUTY_CYCLE_DISABLED_NOTE,
 		DUTY_CYCLE_SLIDERS,
@@ -217,13 +218,14 @@
 	<title>Chirpr</title>
 </svelte:head>
 
-<div class="dashboard">
+<main class="dashboard" aria-label="Chirpr sound designer">
 	<header class="header-bar">
 		<div>
 			<h1>Chirpr</h1>
 			<p>v0.1.0</p>
 		</div>
-		<a href="https://github.com" target="_blank" rel="noreferrer">GitHub</a>
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+		<a href={APP_REPOSITORY_URL} target="_blank" rel="noreferrer">GitHub</a>
 	</header>
 
 	<div class="layout">
@@ -342,7 +344,7 @@
 			<ExportPanel />
 		</div>
 	</div>
-</div>
+</main>
 
 <style>
 	.dashboard {

@@ -89,4 +89,22 @@ describe('createDashboardKeydownHandler', () => {
 		expect(event.preventDefault).not.toHaveBeenCalled();
 		expect(togglePlay).not.toHaveBeenCalled();
 	});
+
+	it('ignores shortcuts when a select is focused', () => {
+		const togglePlay = vi.fn();
+		const handler = createDashboardKeydownHandler({
+			togglePlay,
+			applyRandomCategory: vi.fn(),
+			getLastRandomCategory: () => 'shoot',
+			focusPresetInput: vi.fn(),
+			resetAllParams: vi.fn()
+		});
+		const select = document.createElement('select');
+		const event = keyboardEvent({ key: ' ', code: 'Space', target: select });
+
+		handler(event);
+
+		expect(event.preventDefault).not.toHaveBeenCalled();
+		expect(togglePlay).not.toHaveBeenCalled();
+	});
 });

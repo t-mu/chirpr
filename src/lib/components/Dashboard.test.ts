@@ -2,6 +2,7 @@ import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flatCurve } from '$lib/audio/bezier';
 import Dashboard from './Dashboard.svelte';
+import { APP_REPOSITORY_URL } from '$lib/config/app';
 import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
 import { params, resetParams, updateParam } from '$lib/stores/synthParams.svelte';
 import { PARAM_META } from '$lib/types/paramMeta';
@@ -75,7 +76,9 @@ afterEach(() => {
 describe('Dashboard', () => {
 	it('renders play button immediately', () => {
 		const { getByRole } = render(Dashboard);
+		expect(getByRole('main', { name: 'Chirpr sound designer' })).toBeTruthy();
 		expect(getByRole('button', { name: '▶ PLAY' })).toBeTruthy();
+		expect(getByRole('link', { name: 'GitHub' }).getAttribute('href')).toBe(APP_REPOSITORY_URL);
 	});
 
 	it('uses shared metadata for slider bounds', async () => {

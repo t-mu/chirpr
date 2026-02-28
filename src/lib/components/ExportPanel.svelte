@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { params } from '$lib/stores/synthParams.svelte';
+	import PanelCard from '$lib/components/PanelCard.svelte';
 	import {
 		downloadBlob,
 		exportMP3,
@@ -56,8 +57,7 @@
 	}
 </script>
 
-<section class="panel">
-	<h3>EXPORT</h3>
+<PanelCard title="EXPORT">
 	<div class="controls">
 		<label>
 			Format
@@ -79,22 +79,9 @@
 	{#if flashMessage}
 		<p>{flashMessage}</p>
 	{/if}
-</section>
+</PanelCard>
 
 <style>
-	.panel {
-		border: 2px solid var(--accent);
-		background: var(--surface);
-		padding: 0.75rem;
-		display: grid;
-		gap: 0.6rem;
-	}
-
-	h3 {
-		margin: 0;
-		font-size: 0.7rem;
-	}
-
 	.controls {
 		display: grid;
 		grid-template-columns: 1fr;

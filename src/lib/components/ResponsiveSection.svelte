@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Snippet } from 'svelte';
-	import SectionCard from '$lib/components/SectionCard.svelte';
 
 	interface Props {
 		title: string;
@@ -36,47 +35,48 @@
 	});
 </script>
 
-{#if isMobile}
-	<details class="mobile-accordion" {open}>
-		<summary><h2>{title}</h2></summary>
-		<div class="mobile-accordion__body">
-			{@render children?.()}
-		</div>
-	</details>
-{:else}
-	<SectionCard {title}>
+<details class="section-shell" open={!isMobile || open}>
+	<summary><h2>{title}</h2></summary>
+	<div class="section-shell__body">
 		{@render children?.()}
-	</SectionCard>
-{/if}
+	</div>
+</details>
 
 <style>
-	.mobile-accordion {
+	.section-shell {
 		border: 2px solid var(--accent);
 		background: var(--surface);
 		box-shadow: 4px 4px 0 #000;
+		padding: 0.8rem;
 	}
 
-	.mobile-accordion summary {
+	.section-shell summary {
 		cursor: pointer;
 		list-style: none;
-		padding: 0.75rem;
 		user-select: none;
+		margin-bottom: 0.7rem;
 	}
 
-	.mobile-accordion summary h2 {
+	.section-shell summary h2 {
 		margin: 0;
 		font: inherit;
 		font-size: 1.2rem;
 		display: inline;
 	}
 
-	.mobile-accordion summary::-webkit-details-marker {
+	.section-shell summary::-webkit-details-marker {
 		display: none;
 	}
 
-	.mobile-accordion__body {
+	.section-shell__body {
 		display: grid;
 		gap: 0.7rem;
-		padding: 0 0.75rem 0.75rem;
+	}
+
+	@media (min-width: 901px) {
+		.section-shell summary {
+			cursor: default;
+			pointer-events: none;
+		}
 	}
 </style>

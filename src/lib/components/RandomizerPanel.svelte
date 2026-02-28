@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SoundCategory } from '$lib/audio/randomizer';
+	import PanelCard from '$lib/components/PanelCard.svelte';
 
 	interface Props {
 		onRandomize?: (category: SoundCategory) => void;
@@ -21,29 +22,15 @@
 	}
 </script>
 
-<section class="panel">
-	<h3>RANDOMIZER</h3>
+<PanelCard title="RANDOMIZER">
 	<div class="button-grid">
 		{#each categories as category (category)}
 			<button type="button" onclick={() => randomizeCategory(category)}>{category}</button>
 		{/each}
 	</div>
-</section>
+</PanelCard>
 
 <style>
-	.panel {
-		border: 2px solid var(--accent);
-		background: var(--surface);
-		padding: 0.75rem;
-		display: grid;
-		gap: 0.6rem;
-	}
-
-	h3 {
-		margin: 0;
-		font-size: 0.7rem;
-	}
-
 	.button-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));

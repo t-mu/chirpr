@@ -12,6 +12,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 	if (!(target instanceof HTMLElement)) return false;
 	return (
 		target instanceof HTMLInputElement ||
+		target instanceof HTMLSelectElement ||
 		target instanceof HTMLTextAreaElement ||
 		target.isContentEditable
 	);
