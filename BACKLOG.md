@@ -2126,7 +2126,7 @@ test('BezierEditor is rendered when curve is active, hidden when inactive', asyn
 
 ---
 
-## Task 28 — Randomizer Curve Presets & Preset Compatibility
+## ~~Task 28 — Randomizer Curve Presets & Preset Compatibility~~ ✅ DONE
 
 **Goal:** Make the randomizer produce meaningful automation curves for sound categories where a sweep is the defining characteristic. Also add a migration guard so old presets saved before the `curves` field existed load correctly.
 

@@ -71,4 +71,50 @@ describe('presets store', () => {
 		expect(store.presets.length).toBeGreaterThanOrEqual(5);
 		expect(localStorage.getItem('sfx_initialized')).toBe('1');
 	});
+
+	it('migrateParams adds empty curves for legacy params without curves', async () => {
+		const store = await importStore();
+		const { curves: _legacyCurves, ...legacyWithoutCurves } = DEFAULT_PARAMS;
+		const migrated = store.migrateParams(legacyWithoutCurves);
+		void _legacyCurves;
+
+		expect(migrated.curves).toEqual({});
+	});
+
+	it('migrateParams preserves existing curves', async () => {
+		const store = await importStore();
+		const migrated = store.migrateParams({
+			...DEFAULT_PARAMS,
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 440 },
+					p1: { x: 0.3, y: 330 },
+					p2: { x: 0.7, y: 220 },
+					p3: { x: 1, y: 110 }
+				}
+			}
+		});
+
+		expect(migrated.curves.frequency).toBeDefined();
+	});
+
+	it('loads legacy preset from storage and initializes missing curves', async () => {
+		const { curves: _legacyCurves, ...legacyWithoutCurves } = DEFAULT_PARAMS;
+		void _legacyCurves;
+		localStorage.setItem(
+			'sfx_presets',
+			JSON.stringify([
+				{
+					id: 'legacy-1',
+					name: 'legacy',
+					params: legacyWithoutCurves,
+					createdAt: 1
+				}
+			])
+		);
+		vi.resetModules();
+		const store = await importStore();
+
+		expect(store.presets[0].params.curves).toEqual({});
+	});
 });

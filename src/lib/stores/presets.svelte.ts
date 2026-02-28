@@ -97,7 +97,24 @@ function safeParsePresets(value: string | null): Preset[] {
 	try {
 		const parsed = JSON.parse(value);
 		if (!Array.isArray(parsed)) return [];
-		return parsed as Preset[];
+		const migrated: Preset[] = [];
+		for (const item of parsed) {
+			if (!item || typeof item !== 'object') continue;
+			const entry = item as {
+				id?: unknown;
+				name?: unknown;
+				params?: unknown;
+				createdAt?: unknown;
+			};
+			if (typeof entry.id !== 'string' || typeof entry.name !== 'string') continue;
+			migrated.push({
+				id: entry.id,
+				name: entry.name,
+				params: migrateParams(entry.params),
+				createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : 0
+			});
+		}
+		return migrated;
 	} catch {
 		return [];
 	}
@@ -109,6 +126,18 @@ function canUseStorage(): boolean {
 
 function cloneParams(params: SynthParams): SynthParams {
 	return JSON.parse(JSON.stringify(params)) as SynthParams;
+}
+
+export function migrateParams(raw: unknown): SynthParams {
+	const merged = {
+		...DEFAULT_PARAMS,
+		...(typeof raw === 'object' && raw !== null ? (raw as Partial<SynthParams>) : {})
+	} as SynthParams;
+	// Task 24 added `curves`. Guard against presets saved before this field existed.
+	if (!merged.curves || typeof merged.curves !== 'object' || Array.isArray(merged.curves)) {
+		merged.curves = {};
+	}
+	return merged;
 }
 
 function loadInitialPresets(): Preset[] {

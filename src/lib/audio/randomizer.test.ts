@@ -65,4 +65,42 @@ describe('randomizer', () => {
 			}
 		}
 	});
+
+	it('shoot assigns a descending frequency curve', () => {
+		const result = randomize('shoot');
+		expect(result.curves.frequency).toBeDefined();
+		expect(result.curves.frequency!.p3.y).toBeLessThan(result.curves.frequency!.p0.y);
+	});
+
+	it('jump assigns an ascending frequency curve', () => {
+		const result = randomize('jump');
+		expect(result.curves.frequency).toBeDefined();
+		expect(result.curves.frequency!.p3.y).toBeGreaterThan(result.curves.frequency!.p0.y);
+	});
+
+	it('explosion assigns lpf curve but no frequency curve', () => {
+		const result = randomize('explosion');
+		expect(result.curves.lpfCutoff).toBeDefined();
+		expect(result.curves.frequency).toBeUndefined();
+	});
+
+	it('blip frequency curve ends below 80% of start', () => {
+		const result = randomize('blip');
+		expect(result.curves.frequency).toBeDefined();
+		expect(result.curves.frequency!.p3.y).toBeLessThan(result.curves.frequency!.p0.y * 0.8);
+	});
+
+	it('coin, powerup and hit keep curves empty', () => {
+		expect(randomize('coin').curves).toEqual({});
+		expect(randomize('powerup').curves).toEqual({});
+		expect(randomize('hit').curves).toEqual({});
+	});
+
+	it('global clamping pass does not remove generated curves', () => {
+		for (let i = 0; i < 10; i += 1) {
+			const result = randomize('shoot');
+			expect(result.curves.frequency).toBeDefined();
+			expect(typeof result.curves.frequency!.p0.y).toBe('number');
+		}
+	});
 });

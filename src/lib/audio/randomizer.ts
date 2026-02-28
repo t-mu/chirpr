@@ -1,4 +1,5 @@
 import { DEFAULT_PARAMS, type SynthParams, type Waveform } from '$lib/types/SynthParams';
+import { logSweepCurve, sweepCurve } from './bezier';
 
 export type SoundCategory = 'shoot' | 'jump' | 'explosion' | 'powerup' | 'coin' | 'hit' | 'blip';
 
@@ -60,6 +61,8 @@ const CATEGORY_FREQUENCY_RANGE: Record<SoundCategory, Range> = {
 };
 
 function withGlobalClamp(params: SynthParams): SynthParams {
+	// 'curves' is intentionally absent from GLOBAL_NUMERIC_RANGES.
+	// structuredClone preserves it and this loop only clamps numeric keys.
 	const next = structuredClone(params);
 	const mutable = next as unknown as Record<string, unknown>;
 	for (const [key, range] of Object.entries(GLOBAL_NUMERIC_RANGES)) {
@@ -93,6 +96,9 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.release = randomBetween(0.01, 0.08);
 			output.bitDepth = randomInt(4, 10);
 			output.duration = randomBetween(100, 300);
+			output.curves = {
+				frequency: logSweepCurve(output.frequency, output.frequency * randomBetween(0.04, 0.1), 0.2)
+			};
 			break;
 		case 'jump':
 			output.waveform = 'sawtooth';
@@ -102,6 +108,9 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.vibratoRate = randomBetween(2, 7);
 			output.vibratoDepth = randomBetween(0.05, 0.25);
 			output.duration = randomBetween(200, 500);
+			output.curves = {
+				frequency: logSweepCurve(output.frequency, output.frequency * randomBetween(1.5, 3.0), 0.6)
+			};
 			break;
 		case 'explosion':
 			output.waveform = 'noise';
@@ -114,6 +123,9 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.bitDepth = randomInt(1, 6);
 			output.sampleRateReduction = randomInt(4, 20);
 			output.duration = randomBetween(600, 1500);
+			output.curves = {
+				lpfCutoff: sweepCurve(randomBetween(1500, 4000), randomBetween(60, 250), 0.7)
+			};
 			break;
 		case 'powerup':
 			output.waveform = 'square';
@@ -124,6 +136,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.decay = randomBetween(0.08, 0.25);
 			output.release = randomBetween(0.08, 0.24);
 			output.duration = randomBetween(500, 1200);
+			output.curves = {};
 			break;
 		case 'coin':
 			output.waveform = randomWaveform(['sine', 'square']);
@@ -134,6 +147,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.sustain = 0;
 			output.release = randomBetween(0.02, 0.1);
 			output.duration = randomBetween(100, 250);
+			output.curves = {};
 			break;
 		case 'hit':
 			output.waveform = 'noise';
@@ -144,6 +158,7 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.hpfCutoff = randomBetween(100, 1200);
 			output.bitDepth = randomInt(3, 8);
 			output.duration = randomBetween(80, 200);
+			output.curves = {};
 			break;
 		case 'blip':
 			output.waveform = 'sine';
@@ -153,6 +168,13 @@ export function randomize(category: SoundCategory): SynthParams {
 			output.release = randomBetween(0.01, 0.06);
 			output.detune = randomBetween(-20, 20);
 			output.duration = randomBetween(50, 150);
+			output.curves = {
+				frequency: logSweepCurve(
+					output.frequency,
+					output.frequency * randomBetween(0.4, 0.75),
+					0.15
+				)
+			};
 			break;
 	}
 
