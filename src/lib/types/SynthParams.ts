@@ -27,7 +27,6 @@ export interface SynthParams {
 	bitDepth: number;
 	sampleRateReduction: number;
 	retriggerRate: number;
-	retriggerCount: number;
 	duration: number;
 	/** Active automation curves keyed by automatable parameter. */
 	curves: Partial<Record<CurveableParam, BezierCurve>>;
@@ -58,7 +57,6 @@ export const DEFAULT_PARAMS: SynthParams = {
 	bitDepth: 16,
 	sampleRateReduction: 1,
 	retriggerRate: 0,
-	retriggerCount: 0,
 	duration: 300,
 	curves: {}
 };

@@ -39,8 +39,7 @@ export const EFFECTS_SLIDERS: DashboardSliderConfig[] = [
 	{ key: 'hpfCutoff', label: 'HPF Cutoff' },
 	{ key: 'bitDepth', label: 'Bit Depth' },
 	{ key: 'sampleRateReduction', label: 'Sample Rate Reduction' },
-	{ key: 'retriggerRate', label: 'Retrigger' },
-	{ key: 'retriggerCount', label: 'Retrigger Count' }
+	{ key: 'retriggerRate', label: 'Retrigger' }
 ];
 
 export const PLAYBACK_SLIDERS: DashboardSliderConfig[] = [{ key: 'duration', label: 'Duration' }];

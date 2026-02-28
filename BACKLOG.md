@@ -2373,7 +2373,7 @@ Set `flangerRate: 5`, `flangerDepth: 0.5`, `flangerWet: 0.6` on a sawtooth wave 
 
 ---
 
-## Task 30 — Fix Retrigger: `retriggerCount` Gate Still Active (regression from Task 15)
+## ~~Task 30 — Fix Retrigger: `retriggerCount` Gate Still Active (regression from Task 15)~~ ✅ DONE
 
 **Goal:** Task 15 was supposed to remove the `retriggerCount` field entirely and simplify the retrigger gate to `retriggerRate > 0`. It was marked ✅ DONE but none of the changes were applied. The retrigger effect remains permanently disabled because `retriggerCount` defaults to 0 and has no UI.
 

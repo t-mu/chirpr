@@ -449,8 +449,7 @@ describe('synthesizer', () => {
 	it('applies updated frequency to retrigger loop without replaying', async () => {
 		const synth = await createSynthesizer({
 			frequency: 440,
-			retriggerRate: 8,
-			retriggerCount: 2
+			retriggerRate: 8
 		});
 		const firstSynth = state.synthInstances[0];
 		const retriggerLoop = state.loopInstances[0];

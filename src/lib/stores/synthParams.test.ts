@@ -27,4 +27,8 @@ describe('synthParams store', () => {
 
 		expect(params).toEqual(DEFAULT_PARAMS);
 	});
+
+	it('default params no longer include retriggerCount', () => {
+		expect('retriggerCount' in DEFAULT_PARAMS).toBe(false);
+	});
 });

@@ -42,7 +42,6 @@ export const PARAM_META = {
 	bitDepth: { min: 1, max: 16, step: 1, section: 'bitCrusher' },
 	sampleRateReduction: { min: 1, max: 32, step: 1, section: 'bitCrusher' },
 	retriggerRate: { min: 0, max: 20, step: 0.1, section: 'retrigger' },
-	retriggerCount: { min: 0, max: 16, step: 1, section: 'retrigger' },
 	duration: { min: 50, max: 2000, step: 10, unit: 'ms', section: 'playback' }
 } satisfies Record<NumericSynthParamKey, ParamMeta>;
 

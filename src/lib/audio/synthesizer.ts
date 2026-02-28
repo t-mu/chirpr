@@ -23,8 +23,7 @@ const clampFrequency = (value: number): number => clampParam('frequency', value)
 
 const isArpeggioEnabled = (params: SynthParams): boolean => params.arpSpeed > 0;
 
-const isRetriggerEnabled = (params: SynthParams): boolean =>
-	params.retriggerRate > 0 && params.retriggerCount > 0;
+const isRetriggerEnabled = (params: SynthParams): boolean => params.retriggerRate > 0;
 
 export function orderArpSteps(steps: number[], pattern: ArpPattern): number[] {
 	if (pattern === 'down') {
@@ -176,7 +175,6 @@ class Synthesizer implements SynthesizerAPI {
 		merged.frequency = clampFrequency(merged.frequency);
 		if (isArpeggioEnabled(merged)) {
 			merged.retriggerRate = 0;
-			merged.retriggerCount = 0;
 		}
 		if (isRetriggerEnabled(merged)) {
 			merged.arpSpeed = 0;

@@ -10,12 +10,11 @@ const RETRIGGER_REQUIRED_PARAMS = new Set<keyof SynthParams>([
 	'duration',
 	'arpSpeed',
 	'retriggerRate',
-	'retriggerCount',
 	'waveform'
 ]);
 
 export function isSequencedMode(params: SynthParams): boolean {
-	return params.arpSpeed > 0 || (params.retriggerRate > 0 && params.retriggerCount > 0);
+	return params.arpSpeed > 0 || params.retriggerRate > 0;
 }
 
 export function requiresRetriggerOnChange(paramKey: keyof SynthParams): boolean {

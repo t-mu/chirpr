@@ -157,10 +157,10 @@ describe('Dashboard', () => {
 		expect(queryAllByText('DUTY CYCLE IS AVAILABLE ONLY FOR SQUARE WAVEFORM.').length).toBe(1);
 	});
 
-	it('shows retrigger count slider', async () => {
+	it('shows retrigger slider', async () => {
 		const { findByRole, getByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });
-		expect(getByText('Retrigger Count')).toBeTruthy();
+		expect(getByText('Retrigger')).toBeTruthy();
 	});
 
 	it('shows flanger depth, feedback and mix sliders', async () => {
@@ -293,13 +293,8 @@ describe('Dashboard', () => {
 		await findByRole('button', { name: '▶ PLAY' });
 
 		const retriggerRateInput = getByText('Retrigger').closest('label')?.querySelector('input');
-		const retriggerCountInput = getByText('Retrigger Count')
-			.closest('label')
-			?.querySelector('input');
 		expect(retriggerRateInput).toBeTruthy();
-		expect(retriggerCountInput).toBeTruthy();
 		await fireEvent.input(retriggerRateInput as HTMLInputElement, { target: { value: '8' } });
-		await fireEvent.input(retriggerCountInput as HTMLInputElement, { target: { value: '4' } });
 		await waitFor(() => {
 			expect(mockPlay).toHaveBeenCalled();
 		});
