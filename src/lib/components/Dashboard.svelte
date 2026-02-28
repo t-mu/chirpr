@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { flatCurve } from '$lib/audio/bezier';
 	import { initAudio } from '$lib/audio/engine';
 	import { randomize, type SoundCategory } from '$lib/audio/randomizer';
 	import { createSynthesizer, type SynthesizerAPI } from '$lib/audio/synthesizer';
+	import BezierEditor from '$lib/components/BezierEditor.svelte';
 	import Oscilloscope from '$lib/components/Oscilloscope.svelte';
 	import ParamSlider from '$lib/components/ParamSlider.svelte';
 	import PixelToggle from '$lib/components/PixelToggle.svelte';
@@ -30,7 +32,8 @@
 		type SynthParams,
 		type Waveform as WaveformType
 	} from '$lib/types/SynthParams';
-	import type { NumericParamKey } from '$lib/types/paramMeta';
+	import type { BezierCurve, CurveableParam } from '$lib/types/BezierCurve';
+	import { PARAM_META, type NumericParamKey } from '$lib/types/paramMeta';
 
 	let synthesizer = $state<SynthesizerAPI | null>(null);
 	let isPlaying = $state(false);
@@ -49,8 +52,33 @@
 		{ value: 'sine', label: 'Sine' },
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
+
+	const CURVEABLE_PARAMS: Array<{ key: CurveableParam; label: string }> = [
+		{ key: 'frequency', label: 'PITCH' },
+		{ key: 'lpfCutoff', label: 'LPF CUTOFF' },
+		{ key: 'hpfCutoff', label: 'HPF CUTOFF' },
+		{ key: 'vibratoDepth', label: 'VIB DEPTH' },
+		{ key: 'vibratoRate', label: 'VIB RATE' }
+	];
+
 	function onSliderValueChange(paramKey: NumericParamKey, value: number): void {
 		void applyParam(paramKey, value as SynthParams[typeof paramKey]);
+	}
+
+	function toggleCurve(key: CurveableParam): void {
+		const current = params.curves ?? {};
+		if (current[key]) {
+			const next = { ...current };
+			delete next[key];
+			void applyParam('curves', next);
+			return;
+		}
+		const startValue = params[key] as number;
+		void applyParam('curves', { ...current, [key]: flatCurve(startValue) });
+	}
+
+	function setCurve(key: CurveableParam, curve: BezierCurve): void {
+		void applyParam('curves', { ...(params.curves ?? {}), [key]: curve });
 	}
 
 	function isSequencedPreviewMode(): boolean {
@@ -263,6 +291,29 @@
 					/>
 				{/each}
 			</ResponsiveSection>
+
+			<ResponsiveSection title="AUTOMATION">
+				{#each CURVEABLE_PARAMS as { key, label } (key)}
+					<div class="curve-row">
+						<button
+							type="button"
+							class="curve-toggle"
+							class:active={!!params.curves?.[key]}
+							onclick={() => toggleCurve(key)}
+						>
+							{label}
+						</button>
+						{#if params.curves?.[key]}
+							<BezierEditor
+								curve={params.curves[key]!}
+								paramMin={PARAM_META[key].min}
+								paramMax={PARAM_META[key].max}
+								onChange={(curve) => setCurve(key, curve)}
+							/>
+						{/if}
+					</div>
+				{/each}
+			</ResponsiveSection>
 		</div>
 
 		<div class="right-column">
@@ -361,6 +412,28 @@
 		margin: -0.3rem 0 0;
 		font-size: 0.52rem;
 		color: var(--yellow);
+	}
+
+	.curve-row {
+		display: grid;
+		gap: 0.4rem;
+	}
+
+	.curve-toggle {
+		border: 2px solid var(--accent);
+		background: transparent;
+		color: var(--accent);
+		font: inherit;
+		font-size: 0.6rem;
+		padding: 0.5rem 0.8rem;
+		text-align: left;
+		width: 100%;
+		box-shadow: 2px 2px 0 #000;
+	}
+
+	.curve-toggle.active {
+		background: var(--accent);
+		color: #000;
 	}
 
 	@media (max-width: 900px) {

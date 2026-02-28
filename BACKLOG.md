@@ -1953,7 +1953,7 @@ Test cases:
 
 ---
 
-## Task 27 — Dashboard Automation UI (CurvePanel)
+## ~~Task 27 — Dashboard Automation UI (CurvePanel)~~ ✅ DONE
 
 **Goal:** Add a dedicated AUTOMATION section to the Dashboard where users can enable/disable per-parameter bezier curves and edit them live via the BezierEditor. Wire curve changes through the existing `applyParam` pipeline so debounced previews trigger automatically on every drag.
 

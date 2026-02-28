@@ -1,5 +1,6 @@
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flatCurve } from '$lib/audio/bezier';
 import Dashboard from './Dashboard.svelte';
 import { DEFAULT_PARAMS } from '$lib/types/SynthParams';
 import { params, resetParams, updateParam } from '$lib/stores/synthParams.svelte';
@@ -338,5 +339,35 @@ describe('Dashboard', () => {
 
 		await fireEvent.pointerDown(frequencyInput as HTMLInputElement);
 		expect(mockStartPreview).not.toHaveBeenCalled();
+	});
+
+	it('enables frequency automation curve from toggle', async () => {
+		const { findByRole } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
+
+		expect(params.curves.frequency).toBeDefined();
+	});
+
+	it('disables active frequency automation curve from toggle', async () => {
+		updateParam('curves', { frequency: flatCurve(440) });
+		const { findByRole } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
+
+		expect(params.curves.frequency).toBeUndefined();
+	});
+
+	it('shows editor canvas only while a curve is active', async () => {
+		const { findByRole, queryByLabelText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		expect(queryByLabelText('Bezier curve editor')).toBeNull();
+		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
+		expect(queryByLabelText('Bezier curve editor')).toBeTruthy();
+		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
+		expect(queryByLabelText('Bezier curve editor')).toBeNull();
 	});
 });
