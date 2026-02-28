@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SynthParams } from '$lib/types/SynthParams';
 
 const state = vi.hoisted(() => {
 	const createSignal = (value = 0) => ({
@@ -412,17 +413,49 @@ describe('synthesizer', () => {
 	it('stop cancels scheduled automation on all curveable signals', async () => {
 		const synth = await createSynthesizer();
 		const firstSynth = state.synthInstances[0];
-		const vibrato = state.vibratoInstances[0];
 		const lpf = state.filterInstances.find((f) => f.type === 'lowpass');
 		const hpf = state.filterInstances.find((f) => f.type === 'highpass');
 
 		synth.stop();
 
 		expect(firstSynth.frequency.cancelScheduledValues).toHaveBeenCalled();
-		expect(vibrato.depth.cancelScheduledValues).toHaveBeenCalled();
-		expect(vibrato.frequency.cancelScheduledValues).toHaveBeenCalled();
 		expect(lpf?.frequency.cancelScheduledValues).toHaveBeenCalled();
 		expect(hpf?.frequency.cancelScheduledValues).toHaveBeenCalled();
+	});
+
+	it('ignores legacy vibrato curve keys if they appear in params', async () => {
+		const synth = await createSynthesizer({
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 440 },
+					p1: { x: 0.3, y: 330 },
+					p2: { x: 0.7, y: 220 },
+					p3: { x: 1, y: 110 }
+				}
+			}
+		});
+		const firstSynth = state.synthInstances[0];
+		const vibrato = state.vibratoInstances[0];
+		const legacyCurves = {
+			frequency: {
+				p0: { x: 0, y: 880 },
+				p1: { x: 0.3, y: 660 },
+				p2: { x: 0.7, y: 330 },
+				p3: { x: 1, y: 220 }
+			},
+			vibratoDepth: {
+				p0: { x: 0, y: 0.1 },
+				p1: { x: 0.3, y: 0.3 },
+				p2: { x: 0.7, y: 0.6 },
+				p3: { x: 1, y: 0.8 }
+			}
+		};
+
+		synth.updateParams({ curves: legacyCurves as unknown as SynthParams['curves'] });
+		synth.play();
+
+		expect(firstSynth.frequency.setValueCurveAtTime).toHaveBeenCalled();
+		expect(vibrato.depth.setValueCurveAtTime).not.toHaveBeenCalled();
 	});
 
 	it('restores static values when curve is removed', async () => {

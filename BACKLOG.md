@@ -2587,7 +2587,7 @@ Update any existing test that asserts the old behavior `p1.y === p2.y === midVal
 
 ---
 
-## Task 32 — Vibrato Automation Curves Silently Discarded in Exported Audio
+## ~~Task 32 — Vibrato Automation Curves Silently Discarded in Exported Audio~~ ✅ DONE
 
 **Goal:** `CurveableParam` includes `'vibratoDepth'` and `'vibratoRate'`, and the AUTOMATION section lets users draw bezier curves for them. But the offline exporter (`src/lib/audio/exporter.ts`) has no vibrato node — so vibrato curves play in real-time but are **silently ignored** in exported WAV/MP3/OGG files. Users hear one thing and export another.
 

@@ -56,9 +56,7 @@
 	const CURVEABLE_PARAMS: Array<{ key: CurveableParam; label: string }> = [
 		{ key: 'frequency', label: 'PITCH' },
 		{ key: 'lpfCutoff', label: 'LPF CUTOFF' },
-		{ key: 'hpfCutoff', label: 'HPF CUTOFF' },
-		{ key: 'vibratoDepth', label: 'VIB DEPTH' },
-		{ key: 'vibratoRate', label: 'VIB RATE' }
+		{ key: 'hpfCutoff', label: 'HPF CUTOFF' }
 	];
 
 	function onSliderValueChange(paramKey: NumericParamKey, value: number): void {

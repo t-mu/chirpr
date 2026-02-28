@@ -24,12 +24,7 @@ export interface BezierCurve {
 /**
  * Synth params that support bezier automation.
  */
-export type CurveableParam =
-	| 'frequency'
-	| 'lpfCutoff'
-	| 'hpfCutoff'
-	| 'vibratoDepth'
-	| 'vibratoRate';
+export type CurveableParam = 'frequency' | 'lpfCutoff' | 'hpfCutoff';
 
 // If this line errors, update CurveableParam to match SynthParams keys.
 type _CurveableParamCheck = CurveableParam extends keyof SynthParams ? true : never;

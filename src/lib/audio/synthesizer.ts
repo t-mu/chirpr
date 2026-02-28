@@ -310,16 +310,6 @@ class Synthesizer implements SynthesizerAPI {
 			this.hpf.frequency.cancelScheduledValues(now);
 			this.hpf.frequency.setValueCurveAtTime(samples, now, durationSec);
 		}
-		if (curves.vibratoDepth) {
-			const samples = toCurveValues(sampleCurve(curves.vibratoDepth, sampleCount));
-			this.vibrato.depth.cancelScheduledValues(now);
-			this.vibrato.depth.setValueCurveAtTime(samples, now, durationSec);
-		}
-		if (curves.vibratoRate) {
-			const samples = toCurveValues(sampleCurve(curves.vibratoRate, sampleCount));
-			this.vibrato.frequency.cancelScheduledValues(now);
-			this.vibrato.frequency.setValueCurveAtTime(samples, now, durationSec);
-		}
 	}
 
 	private cancelCurveAutomation(): void {
@@ -329,8 +319,6 @@ class Synthesizer implements SynthesizerAPI {
 		}
 		this.lpf.frequency.cancelScheduledValues(now);
 		this.hpf.frequency.cancelScheduledValues(now);
-		this.vibrato.depth.cancelScheduledValues(now);
-		this.vibrato.frequency.cancelScheduledValues(now);
 	}
 
 	private restoreStaticParams(params: SynthParams): void {
@@ -348,14 +336,8 @@ class Synthesizer implements SynthesizerAPI {
 			this.hpf.frequency.cancelScheduledValues(now);
 			this.hpf.frequency.value = clampParam('hpfCutoff', params.hpfCutoff);
 		}
-		if (!curves.vibratoDepth) {
-			this.vibrato.depth.cancelScheduledValues(now);
-			this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
-		}
-		if (!curves.vibratoRate) {
-			this.vibrato.frequency.cancelScheduledValues(now);
-			this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
-		}
+		this.vibrato.depth.value = clampParam('vibratoDepth', params.vibratoDepth);
+		this.vibrato.frequency.value = clampParam('vibratoRate', params.vibratoRate);
 	}
 }
 

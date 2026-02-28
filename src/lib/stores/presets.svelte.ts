@@ -137,6 +137,12 @@ export function migrateParams(raw: unknown): SynthParams {
 	if (!merged.curves || typeof merged.curves !== 'object' || Array.isArray(merged.curves)) {
 		merged.curves = {};
 	}
+	const validCurveKeys = ['frequency', 'lpfCutoff', 'hpfCutoff'] as const;
+	for (const key of Object.keys(merged.curves)) {
+		if (!validCurveKeys.includes(key as (typeof validCurveKeys)[number])) {
+			delete (merged.curves as Record<string, unknown>)[key];
+		}
+	}
 	return merged;
 }
 

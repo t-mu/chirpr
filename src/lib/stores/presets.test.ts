@@ -117,4 +117,28 @@ describe('presets store', () => {
 
 		expect(store.presets[0].params.curves).toEqual({});
 	});
+
+	it('migrateParams strips stale vibrato curve keys', async () => {
+		const store = await importStore();
+		const migrated = store.migrateParams({
+			...DEFAULT_PARAMS,
+			curves: {
+				frequency: {
+					p0: { x: 0, y: 440 },
+					p1: { x: 0.3, y: 330 },
+					p2: { x: 0.7, y: 220 },
+					p3: { x: 1, y: 110 }
+				},
+				vibratoDepth: {
+					p0: { x: 0, y: 0.1 },
+					p1: { x: 0.3, y: 0.25 },
+					p2: { x: 0.7, y: 0.5 },
+					p3: { x: 1, y: 0.8 }
+				}
+			}
+		});
+
+		expect(migrated.curves.frequency).toBeDefined();
+		expect((migrated.curves as Record<string, unknown>).vibratoDepth).toBeUndefined();
+	});
 });
