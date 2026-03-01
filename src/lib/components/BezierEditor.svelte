@@ -7,6 +7,7 @@
 		paramMax: number;
 		canvasWidth?: number;
 		canvasHeight?: number;
+		renderHeight?: number | string;
 		onChange: (curve: BezierCurve) => void;
 	}
 
@@ -16,6 +17,7 @@
 		paramMax,
 		canvasWidth = 240,
 		canvasHeight = 100,
+		renderHeight,
 		onChange
 	}: Props = $props();
 	const HIT_RADIUS = 12;
@@ -23,6 +25,11 @@
 
 	let canvas = $state<HTMLCanvasElement | null>(null);
 	let activePoint = $state<'p0' | 'p1' | 'p2' | 'p3' | null>(null);
+
+	function resolveHeight(value: number | string | undefined): string | undefined {
+		if (value === undefined) return undefined;
+		return typeof value === 'number' ? `${value}px` : value;
+	}
 
 	function cx(normX: number): number {
 		return normX * canvasWidth;
@@ -223,6 +230,9 @@
 	width={canvasWidth}
 	height={canvasHeight}
 	aria-label="Bezier curve editor"
+	style={resolveHeight(renderHeight)
+		? `--bezier-height: ${resolveHeight(renderHeight)};`
+		: undefined}
 	onpointerdown={onPointerDown}
 	onpointermove={onPointerMove}
 	onpointerup={onPointerUp}
@@ -232,7 +242,7 @@
 <style>
 	canvas {
 		width: 100%;
-		height: auto;
+		height: var(--bezier-height, auto);
 		display: block;
 		border: 2px solid var(--accent, #00e5ff);
 		box-shadow: 4px 4px 0 #000;

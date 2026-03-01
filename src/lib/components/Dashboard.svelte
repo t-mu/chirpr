@@ -60,6 +60,7 @@
 		{ key: 'lpfCutoff', label: 'LPF CUTOFF' },
 		{ key: 'hpfCutoff', label: 'HPF CUTOFF' }
 	];
+	const OSC_PANEL_HEIGHT = 'clamp(180px, 24vw, 260px)';
 
 	function alignCurveStart(curve: BezierCurve, startValue: number): BezierCurve {
 		if (curve.p0.y === startValue) return curve;
@@ -267,7 +268,7 @@
 									onChange={(value) => void applyParam('waveform', value as WaveformType)}
 								/>
 							</div>
-							<Oscilloscope waveform={waveformSource} />
+							<Oscilloscope waveform={waveformSource} renderHeight={OSC_PANEL_HEIGHT} />
 						</div>
 					</div>
 					<div class="osc-curve">
@@ -278,6 +279,7 @@
 							paramMax={PARAM_META.frequency.max}
 							canvasWidth={320}
 							canvasHeight={220}
+							renderHeight={OSC_PANEL_HEIGHT}
 							onChange={(curve) => setCurve('frequency', curve)}
 						/>
 					</div>

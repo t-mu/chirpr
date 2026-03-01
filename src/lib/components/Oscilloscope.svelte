@@ -6,10 +6,16 @@
 
 	interface Props {
 		waveform: WaveformReader;
+		renderHeight?: number | string;
 	}
 
-	let { waveform }: Props = $props();
+	let { waveform, renderHeight }: Props = $props();
 	let canvas = $state<HTMLCanvasElement | null>(null);
+
+	function resolveHeight(value: number | string | undefined): string | undefined {
+		if (value === undefined) return undefined;
+		return typeof value === 'number' ? `${value}px` : value;
+	}
 
 	function drawWave(): void {
 		if (!canvas) return;
@@ -52,7 +58,12 @@
 	});
 </script>
 
-<div class="oscilloscope-wrap">
+<div
+	class="oscilloscope-wrap"
+	style={resolveHeight(renderHeight)
+		? `--oscilloscope-height: ${resolveHeight(renderHeight)};`
+		: undefined}
+>
 	<canvas bind:this={canvas} width="640" height="220" class="oscilloscope"></canvas>
 </div>
 
@@ -77,7 +88,7 @@
 
 	.oscilloscope {
 		width: 100%;
-		height: auto;
+		height: var(--oscilloscope-height, auto);
 		display: block;
 		image-rendering: pixelated;
 		border: 2px solid var(--accent, #00e5ff);
