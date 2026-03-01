@@ -198,6 +198,15 @@ describe('Dashboard', () => {
 		expect(container.querySelectorAll('.filter-column .param-grid--stacked')).toHaveLength(2);
 	});
 
+	it('keeps oscillator controls in shared grid and waveform buttons above scope', async () => {
+		const { container, findByRole } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		expect(container.querySelector('.osc-head.param-grid')).toBeTruthy();
+		const oscContent = container.querySelector('.osc-preview__content');
+		expect(oscContent?.firstElementChild?.classList.contains('osc-preview__waveforms')).toBe(true);
+	});
+
 	it('shows retrigger slider', async () => {
 		const { findByRole, getByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });

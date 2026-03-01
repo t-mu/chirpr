@@ -244,7 +244,7 @@
 	<div class="layout">
 		<div class="left-column">
 			<ResponsiveSection title="OSCILLATOR" open={true}>
-				<div class="osc-head">
+				<div class="param-grid osc-head">
 					<div class="osc-preview">
 						<p class="control-label">Oscilloscope</p>
 						<div class="osc-preview__content">
@@ -537,12 +537,13 @@
 	}
 
 	.osc-preview__waveforms :global(.pixel-toggle) {
-		display: grid;
+		display: flex;
+		flex-wrap: wrap;
 		gap: 0.4rem;
 	}
 
 	.osc-preview__waveforms :global(.pixel-toggle button) {
-		width: 100%;
+		flex: 1 1 4.5rem;
 		padding: 0.65rem 1rem;
 	}
 
@@ -593,16 +594,15 @@
 		.param-grid--stacked {
 			grid-template-columns: 1fr;
 		}
+
+		.osc-head {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			align-items: start;
+		}
 	}
 
 	@media (min-width: 1100px) {
-		.osc-head {
-			grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-			align-items: start;
-		}
-
 		.osc-preview__content {
-			grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr);
 			align-items: stretch;
 		}
 
