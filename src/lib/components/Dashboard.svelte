@@ -259,12 +259,16 @@
 				<div class="osc-head">
 					<div class="osc-preview">
 						<p class="osc-preview__label">OSCILLOSCOPE</p>
-						<PixelToggle
-							options={waveformOptions}
-							selected={params.waveform}
-							onChange={(value) => void applyParam('waveform', value as WaveformType)}
-						/>
-						<Oscilloscope waveform={waveformSource} />
+						<div class="osc-preview__content">
+							<div class="osc-preview__waveforms">
+								<PixelToggle
+									options={waveformOptions}
+									selected={params.waveform}
+									onChange={(value) => void applyParam('waveform', value as WaveformType)}
+								/>
+							</div>
+							<Oscilloscope waveform={waveformSource} />
+						</div>
 					</div>
 					<div class="osc-curve">
 						<p class="osc-preview__label">PITCH CURVE</p>
@@ -272,6 +276,8 @@
 							curve={getPitchCurve()}
 							paramMin={PARAM_META.frequency.min}
 							paramMax={PARAM_META.frequency.max}
+							canvasWidth={320}
+							canvasHeight={220}
 							onChange={(curve) => setCurve('frequency', curve)}
 						/>
 					</div>
@@ -475,6 +481,21 @@
 		gap: 0.5rem;
 	}
 
+	.osc-preview__content {
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.osc-preview__waveforms :global(.pixel-toggle) {
+		display: grid;
+		gap: 0.4rem;
+	}
+
+	.osc-preview__waveforms :global(.pixel-toggle button) {
+		width: 100%;
+		padding: 0.65rem 1rem;
+	}
+
 	.osc-head {
 		display: grid;
 		gap: 0.75rem;
@@ -531,6 +552,11 @@
 		.osc-head {
 			grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 			align-items: start;
+		}
+
+		.osc-preview__content {
+			grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr);
+			align-items: stretch;
 		}
 	}
 </style>

@@ -5,13 +5,19 @@
 		curve: BezierCurve;
 		paramMin: number;
 		paramMax: number;
+		canvasWidth?: number;
+		canvasHeight?: number;
 		onChange: (curve: BezierCurve) => void;
 	}
 
-	let { curve, paramMin, paramMax, onChange }: Props = $props();
-
-	const W = 240;
-	const H = 100;
+	let {
+		curve,
+		paramMin,
+		paramMax,
+		canvasWidth = 240,
+		canvasHeight = 100,
+		onChange
+	}: Props = $props();
 	const HIT_RADIUS = 12;
 	const PT = 4;
 
@@ -19,21 +25,21 @@
 	let activePoint = $state<'p0' | 'p1' | 'p2' | 'p3' | null>(null);
 
 	function cx(normX: number): number {
-		return normX * W;
+		return normX * canvasWidth;
 	}
 
 	function cy(value: number): number {
-		return (1 - (value - paramMin) / (paramMax - paramMin)) * H;
+		return (1 - (value - paramMin) / (paramMax - paramMin)) * canvasHeight;
 	}
 
 	function normX(canvasX: number): number {
-		return Math.max(0, Math.min(1, canvasX / W));
+		return Math.max(0, Math.min(1, canvasX / canvasWidth));
 	}
 
 	function paramValue(canvasY: number): number {
 		return Math.max(
 			paramMin,
-			Math.min(paramMax, paramMin + (1 - canvasY / H) * (paramMax - paramMin))
+			Math.min(paramMax, paramMin + (1 - canvasY / canvasHeight) * (paramMax - paramMin))
 		);
 	}
 
@@ -41,8 +47,8 @@
 		if (!canvas) return { x: 0, y: 0 };
 		const rect = canvas.getBoundingClientRect();
 		return {
-			x: (e.clientX - rect.left) * (W / rect.width),
-			y: (e.clientY - rect.top) * (H / rect.height)
+			x: (e.clientX - rect.left) * (canvasWidth / rect.width),
+			y: (e.clientY - rect.top) * (canvasHeight / rect.height)
 		};
 	}
 
@@ -74,12 +80,12 @@
 		for (const t of [0.25, 0.5, 0.75]) {
 			ctx.beginPath();
 			ctx.moveTo(cx(t), 0);
-			ctx.lineTo(cx(t), H);
+			ctx.lineTo(cx(t), canvasHeight);
 			ctx.stroke();
 			const v = paramMin + t * (paramMax - paramMin);
 			ctx.beginPath();
 			ctx.moveTo(0, cy(v));
-			ctx.lineTo(W, cy(v));
+			ctx.lineTo(canvasWidth, cy(v));
 			ctx.stroke();
 		}
 	}
@@ -125,7 +131,7 @@
 		if (!ctx) return;
 
 		ctx.fillStyle = '#0a0a1a';
-		ctx.fillRect(0, 0, W, H);
+		ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
 		drawGrid(ctx);
 		drawCurve(ctx);
@@ -148,7 +154,9 @@
 			curve.p3.x +
 			curve.p3.y +
 			paramMin +
-			paramMax;
+			paramMax +
+			canvasWidth +
+			canvasHeight;
 		void tracked;
 		void canvas;
 		draw();
@@ -212,8 +220,8 @@
 
 <canvas
 	bind:this={canvas}
-	width={W}
-	height={H}
+	width={canvasWidth}
+	height={canvasHeight}
 	aria-label="Bezier curve editor"
 	onpointerdown={onPointerDown}
 	onpointermove={onPointerMove}
