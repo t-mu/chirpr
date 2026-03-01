@@ -57,10 +57,25 @@
 	] satisfies Array<{ value: WaveformType; label: string }>;
 
 	const CURVEABLE_PARAMS: Array<{ key: CurveableParam; label: string }> = [
-		{ key: 'frequency', label: 'PITCH' },
 		{ key: 'lpfCutoff', label: 'LPF CUTOFF' },
 		{ key: 'hpfCutoff', label: 'HPF CUTOFF' }
 	];
+
+	function alignCurveStart(curve: BezierCurve, startValue: number): BezierCurve {
+		if (curve.p0.y === startValue) return curve;
+		return {
+			...curve,
+			p0: { ...curve.p0, y: startValue }
+		};
+	}
+
+	function getPitchCurve(): BezierCurve {
+		const pitchCurve = params.curves?.frequency;
+		if (!pitchCurve) {
+			return flatCurve(params.frequency);
+		}
+		return alignCurveStart(pitchCurve, params.frequency);
+	}
 
 	function onSliderValueChange(paramKey: NumericParamKey, value: number): void {
 		void applyParam(paramKey, value as SynthParams[typeof paramKey]);
@@ -91,7 +106,15 @@
 		value: SynthParams[K]
 	): Promise<void> {
 		updateParam(key, value);
-		synthesizer?.updateParams({ [key]: params[key] });
+		const patch: Partial<SynthParams> = { [key]: params[key] } as Partial<SynthParams>;
+		if (key === 'frequency' && params.curves?.frequency) {
+			const nextFrequencyCurve = alignCurveStart(params.curves.frequency, params.frequency);
+			if (nextFrequencyCurve !== params.curves.frequency) {
+				updateParam('curves', { ...params.curves, frequency: nextFrequencyCurve });
+				patch.curves = params.curves;
+			}
+		}
+		synthesizer?.updateParams(patch);
 		await previewController.syncMode();
 		if (isPlaying && synthesizer && requiresRetriggerOnChange(key)) {
 			restartPlayback(synthesizer);
@@ -233,14 +256,25 @@
 	<div class="layout">
 		<div class="left-column">
 			<ResponsiveSection title="OSCILLATOR" open={true}>
-				<div class="osc-preview">
-					<p class="osc-preview__label">OSCILLOSCOPE</p>
-					<PixelToggle
-						options={waveformOptions}
-						selected={params.waveform}
-						onChange={(value) => void applyParam('waveform', value as WaveformType)}
-					/>
-					<Oscilloscope waveform={waveformSource} />
+				<div class="osc-head">
+					<div class="osc-preview">
+						<p class="osc-preview__label">OSCILLOSCOPE</p>
+						<PixelToggle
+							options={waveformOptions}
+							selected={params.waveform}
+							onChange={(value) => void applyParam('waveform', value as WaveformType)}
+						/>
+						<Oscilloscope waveform={waveformSource} />
+					</div>
+					<div class="osc-curve">
+						<p class="osc-preview__label">PITCH CURVE</p>
+						<BezierEditor
+							curve={getPitchCurve()}
+							paramMin={PARAM_META.frequency.min}
+							paramMax={PARAM_META.frequency.max}
+							onChange={(curve) => setCurve('frequency', curve)}
+						/>
+					</div>
 				</div>
 				{#each OSCILLATOR_SLIDERS as slider (slider.key)}
 					<ParamSlider
@@ -441,6 +475,17 @@
 		gap: 0.5rem;
 	}
 
+	.osc-head {
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	.osc-curve {
+		display: grid;
+		gap: 0.5rem;
+		align-content: start;
+	}
+
 	.osc-preview__label {
 		margin: 0;
 		font-size: 0.65rem;
@@ -479,6 +524,13 @@
 	@media (max-width: 900px) {
 		.layout {
 			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (min-width: 1100px) {
+		.osc-head {
+			grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+			align-items: start;
 		}
 	}
 </style>

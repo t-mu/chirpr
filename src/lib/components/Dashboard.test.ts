@@ -177,6 +177,17 @@ describe('Dashboard', () => {
 		expect(sectionTitles).not.toContain('OSCILLOSCOPE');
 	});
 
+	it('renders always-visible pitch curve editor in oscillator section', async () => {
+		const { findByRole, getByText, queryByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		expect(getByText('PITCH CURVE')).toBeTruthy();
+		expect(queryByText('PITCH')).toBeNull();
+		expect(
+			document.querySelectorAll('canvas[aria-label="Bezier curve editor"]').length
+		).toBeGreaterThan(0);
+	});
+
 	it('shows retrigger slider', async () => {
 		const { findByRole, getByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });
@@ -225,6 +236,31 @@ describe('Dashboard', () => {
 		await fireEvent.input(input as HTMLInputElement, { target: { value: '12' } });
 
 		expect(mockUpdateParams).toHaveBeenCalledWith({ sampleRateReduction: 12 });
+	});
+
+	it('syncs pitch curve start value to selected frequency', async () => {
+		updateParam('frequency', 900);
+		updateParam('curves', { frequency: flatCurve(700) });
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const frequencyInput = getByText('Frequency').closest('label')?.querySelector('input');
+		expect(frequencyInput).toBeTruthy();
+		await fireEvent.input(frequencyInput as HTMLInputElement, { target: { value: '1200' } });
+
+		expect(mockUpdateParams).toHaveBeenCalledWith(
+			expect.objectContaining({
+				curves: expect.objectContaining({
+					frequency: expect.objectContaining({
+						p0: expect.objectContaining({ y: 1200 })
+					})
+				})
+			})
+		);
 	});
 
 	it('restarts playback when duration changes while playing', async () => {
@@ -355,35 +391,5 @@ describe('Dashboard', () => {
 
 		await fireEvent.pointerDown(frequencyInput as HTMLInputElement);
 		expect(mockStartPreview).not.toHaveBeenCalled();
-	});
-
-	it('enables frequency automation curve from toggle', async () => {
-		const { findByRole } = render(Dashboard);
-		await findByRole('button', { name: '▶ PLAY' });
-
-		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
-
-		expect(params.curves.frequency).toBeDefined();
-	});
-
-	it('disables active frequency automation curve from toggle', async () => {
-		updateParam('curves', { frequency: flatCurve(440) });
-		const { findByRole } = render(Dashboard);
-		await findByRole('button', { name: '▶ PLAY' });
-
-		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
-
-		expect(params.curves.frequency).toBeUndefined();
-	});
-
-	it('shows editor canvas only while a curve is active', async () => {
-		const { findByRole, queryByLabelText } = render(Dashboard);
-		await findByRole('button', { name: '▶ PLAY' });
-
-		expect(queryByLabelText('Bezier curve editor')).toBeNull();
-		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
-		expect(queryByLabelText('Bezier curve editor')).toBeTruthy();
-		await fireEvent.click(await findByRole('button', { name: 'PITCH' }));
-		expect(queryByLabelText('Bezier curve editor')).toBeNull();
 	});
 });
