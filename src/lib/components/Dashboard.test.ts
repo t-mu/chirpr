@@ -168,24 +168,34 @@ describe('Dashboard', () => {
 		expect(getByText('MODULATION')).toBeTruthy();
 		expect(getByText('FLANGER')).toBeTruthy();
 		expect(getByText('BIT CRUSHER')).toBeTruthy();
-		expect(getByText('OSCILLOSCOPE')).toBeTruthy();
+		expect(getByText('Oscilloscope')).toBeTruthy();
 		expect(queryByText('EFFECTS')).toBeNull();
 		expect(queryByText('DUTY CYCLE')).toBeNull();
+		expect(queryByText('AUTOMATION')).toBeNull();
 		const sectionTitles = Array.from(container.querySelectorAll('summary h2')).map((node) =>
 			node.textContent?.trim()
 		);
 		expect(sectionTitles).not.toContain('OSCILLOSCOPE');
+		expect(sectionTitles).not.toContain('AUTOMATION');
 	});
 
 	it('renders always-visible pitch curve editor in oscillator section', async () => {
 		const { findByRole, getByText, queryByText } = render(Dashboard);
 		await findByRole('button', { name: '▶ PLAY' });
 
-		expect(getByText('PITCH CURVE')).toBeTruthy();
+		expect(getByText('Pitch Curve')).toBeTruthy();
+		expect(getByText('LPF Curve')).toBeTruthy();
+		expect(getByText('HPF Curve')).toBeTruthy();
 		expect(queryByText('PITCH')).toBeNull();
-		expect(
-			document.querySelectorAll('canvas[aria-label="Bezier curve editor"]').length
-		).toBeGreaterThan(0);
+		expect(document.querySelectorAll('canvas[aria-label="Bezier curve editor"]').length).toBe(3);
+	});
+
+	it('uses shared two-up slider grids while keeping filter columns stacked', async () => {
+		const { container, findByRole } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+
+		expect(container.querySelectorAll('.param-grid').length).toBeGreaterThan(4);
+		expect(container.querySelectorAll('.filter-column .param-grid--stacked')).toHaveLength(2);
 	});
 
 	it('shows retrigger slider', async () => {
@@ -257,6 +267,56 @@ describe('Dashboard', () => {
 				curves: expect.objectContaining({
 					frequency: expect.objectContaining({
 						p0: expect.objectContaining({ y: 1200 })
+					})
+				})
+			})
+		);
+	});
+
+	it('syncs lpf curve start value to selected lpf cutoff', async () => {
+		updateParam('lpfCutoff', 7000);
+		updateParam('curves', { lpfCutoff: flatCurve(3000) });
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const lpfInput = getByText('LPF Cutoff').closest('label')?.querySelector('input');
+		expect(lpfInput).toBeTruthy();
+		await fireEvent.input(lpfInput as HTMLInputElement, { target: { value: '9000' } });
+
+		expect(mockUpdateParams).toHaveBeenCalledWith(
+			expect.objectContaining({
+				curves: expect.objectContaining({
+					lpfCutoff: expect.objectContaining({
+						p0: expect.objectContaining({ y: 9000 })
+					})
+				})
+			})
+		);
+	});
+
+	it('syncs hpf curve start value to selected hpf cutoff', async () => {
+		updateParam('hpfCutoff', 120);
+		updateParam('curves', { hpfCutoff: flatCurve(60) });
+		const { findByRole, getByText } = render(Dashboard);
+		await findByRole('button', { name: '▶ PLAY' });
+		await fireEvent.click(await findByRole('button', { name: '▶ PLAY' }));
+		await waitFor(() => {
+			expect(mockPlay).toHaveBeenCalledTimes(1);
+		});
+
+		const hpfInput = getByText('HPF Cutoff').closest('label')?.querySelector('input');
+		expect(hpfInput).toBeTruthy();
+		await fireEvent.input(hpfInput as HTMLInputElement, { target: { value: '300' } });
+
+		expect(mockUpdateParams).toHaveBeenCalledWith(
+			expect.objectContaining({
+				curves: expect.objectContaining({
+					hpfCutoff: expect.objectContaining({
+						p0: expect.objectContaining({ y: 300 })
 					})
 				})
 			})

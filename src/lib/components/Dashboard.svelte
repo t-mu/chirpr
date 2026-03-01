@@ -17,7 +17,6 @@
 		BIT_CRUSHER_SLIDERS,
 		DUTY_CYCLE_DISABLED_NOTE,
 		ENVELOPE_SLIDERS,
-		FILTERS_SLIDERS,
 		FLANGER_SLIDERS,
 		MODULATION_SLIDERS,
 		OSCILLATOR_SLIDERS,
@@ -56,11 +55,9 @@
 		{ value: 'noise', label: 'Noise' }
 	] satisfies Array<{ value: WaveformType; label: string }>;
 
-	const CURVEABLE_PARAMS: Array<{ key: CurveableParam; label: string }> = [
-		{ key: 'lpfCutoff', label: 'LPF CUTOFF' },
-		{ key: 'hpfCutoff', label: 'HPF CUTOFF' }
-	];
+	const CURVEABLE_SYNC_KEYS: CurveableParam[] = ['frequency', 'lpfCutoff', 'hpfCutoff'];
 	const OSC_PANEL_HEIGHT = 'clamp(180px, 24vw, 260px)';
+	const FILTER_CURVE_HEIGHT = 'clamp(140px, 18vw, 200px)';
 
 	function alignCurveStart(curve: BezierCurve, startValue: number): BezierCurve {
 		if (curve.p0.y === startValue) return curve;
@@ -70,28 +67,14 @@
 		};
 	}
 
-	function getPitchCurve(): BezierCurve {
-		const pitchCurve = params.curves?.frequency;
-		if (!pitchCurve) {
-			return flatCurve(params.frequency);
-		}
-		return alignCurveStart(pitchCurve, params.frequency);
+	function getCurve(key: CurveableParam): BezierCurve {
+		const curve = params.curves?.[key];
+		if (!curve) return flatCurve(params[key] as number);
+		return alignCurveStart(curve, params[key] as number);
 	}
 
 	function onSliderValueChange(paramKey: NumericParamKey, value: number): void {
 		void applyParam(paramKey, value as SynthParams[typeof paramKey]);
-	}
-
-	function toggleCurve(key: CurveableParam): void {
-		const current = params.curves ?? {};
-		if (current[key]) {
-			const next = { ...current };
-			delete next[key];
-			void applyParam('curves', next);
-			return;
-		}
-		const startValue = params[key] as number;
-		void applyParam('curves', { ...current, [key]: flatCurve(startValue) });
 	}
 
 	function setCurve(key: CurveableParam, curve: BezierCurve): void {
@@ -108,11 +91,15 @@
 	): Promise<void> {
 		updateParam(key, value);
 		const patch: Partial<SynthParams> = { [key]: params[key] } as Partial<SynthParams>;
-		if (key === 'frequency' && params.curves?.frequency) {
-			const nextFrequencyCurve = alignCurveStart(params.curves.frequency, params.frequency);
-			if (nextFrequencyCurve !== params.curves.frequency) {
-				updateParam('curves', { ...params.curves, frequency: nextFrequencyCurve });
-				patch.curves = params.curves;
+		if (CURVEABLE_SYNC_KEYS.includes(key as CurveableParam)) {
+			const curveKey = key as CurveableParam;
+			const currentCurve = params.curves?.[curveKey];
+			if (currentCurve) {
+				const nextCurve = alignCurveStart(currentCurve, params[curveKey] as number);
+				if (nextCurve !== currentCurve) {
+					updateParam('curves', { ...(params.curves ?? {}), [curveKey]: nextCurve });
+					patch.curves = params.curves;
+				}
 			}
 		}
 		synthesizer?.updateParams(patch);
@@ -259,7 +246,7 @@
 			<ResponsiveSection title="OSCILLATOR" open={true}>
 				<div class="osc-head">
 					<div class="osc-preview">
-						<p class="osc-preview__label">OSCILLOSCOPE</p>
+						<p class="control-label">Oscilloscope</p>
 						<div class="osc-preview__content">
 							<div class="osc-preview__waveforms">
 								<PixelToggle
@@ -272,9 +259,9 @@
 						</div>
 					</div>
 					<div class="osc-curve">
-						<p class="osc-preview__label">PITCH CURVE</p>
+						<p class="control-label">Pitch Curve</p>
 						<BezierEditor
-							curve={getPitchCurve()}
+							curve={getCurve('frequency')}
 							paramMin={PARAM_META.frequency.min}
 							paramMax={PARAM_META.frequency.max}
 							canvasWidth={320}
@@ -284,123 +271,168 @@
 						/>
 					</div>
 				</div>
-				{#each OSCILLATOR_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						disabled={slider.disabledWhen?.(params) ?? false}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
-				{#if params.waveform !== 'square'}
-					<p class="section-note">{DUTY_CYCLE_DISABLED_NOTE}</p>
-				{/if}
+				<div class="param-grid">
+					{#each OSCILLATOR_SLIDERS as slider (slider.key)}
+						<ParamSlider
+							paramKey={slider.key}
+							label={slider.label}
+							value={params[slider.key]}
+							disabled={slider.disabledWhen?.(params) ?? false}
+							onChange={(value) => onSliderValueChange(slider.key, value)}
+							onDragStart={onSliderDragStart}
+							onDragEnd={onSliderDragEnd}
+						/>
+					{/each}
+					{#if params.waveform !== 'square'}
+						<p class="section-note param-grid__note">{DUTY_CYCLE_DISABLED_NOTE}</p>
+					{/if}
+				</div>
 			</ResponsiveSection>
 
 			<ResponsiveSection title="ENVELOPE">
-				{#each ENVELOPE_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
+				<div class="param-grid">
+					{#each ENVELOPE_SLIDERS as slider (slider.key)}
+						<ParamSlider
+							paramKey={slider.key}
+							label={slider.label}
+							value={params[slider.key]}
+							onChange={(value) => onSliderValueChange(slider.key, value)}
+							onDragStart={onSliderDragStart}
+							onDragEnd={onSliderDragEnd}
+						/>
+					{/each}
+				</div>
 			</ResponsiveSection>
 
 			<ResponsiveSection title="FILTERS">
-				{#each FILTERS_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
+				<div class="filters-grid">
+					<div class="filter-column">
+						<div class="param-grid param-grid--stacked">
+							<ParamSlider
+								paramKey="lpfCutoff"
+								label="LPF Cutoff"
+								value={params.lpfCutoff}
+								onChange={(value) => onSliderValueChange('lpfCutoff', value)}
+								onDragStart={onSliderDragStart}
+								onDragEnd={onSliderDragEnd}
+							/>
+							<ParamSlider
+								paramKey="lpfResonance"
+								label="LPF Resonance"
+								value={params.lpfResonance}
+								onChange={(value) => onSliderValueChange('lpfResonance', value)}
+								onDragStart={onSliderDragStart}
+								onDragEnd={onSliderDragEnd}
+							/>
+						</div>
+						<div class="filter-curve">
+							<p class="control-label">LPF Curve</p>
+							<BezierEditor
+								curve={getCurve('lpfCutoff')}
+								paramMin={PARAM_META.lpfCutoff.min}
+								paramMax={PARAM_META.lpfCutoff.max}
+								canvasWidth={280}
+								canvasHeight={180}
+								renderHeight={FILTER_CURVE_HEIGHT}
+								onChange={(curve) => setCurve('lpfCutoff', curve)}
+							/>
+						</div>
+					</div>
+					<div class="filter-column">
+						<div class="param-grid param-grid--stacked">
+							<ParamSlider
+								paramKey="hpfCutoff"
+								label="HPF Cutoff"
+								value={params.hpfCutoff}
+								onChange={(value) => onSliderValueChange('hpfCutoff', value)}
+								onDragStart={onSliderDragStart}
+								onDragEnd={onSliderDragEnd}
+							/>
+							<ParamSlider
+								paramKey="hpfResonance"
+								label="HPF Resonance"
+								value={params.hpfResonance}
+								onChange={(value) => onSliderValueChange('hpfResonance', value)}
+								onDragStart={onSliderDragStart}
+								onDragEnd={onSliderDragEnd}
+							/>
+						</div>
+						<div class="filter-curve">
+							<p class="control-label">HPF Curve</p>
+							<BezierEditor
+								curve={getCurve('hpfCutoff')}
+								paramMin={PARAM_META.hpfCutoff.min}
+								paramMax={PARAM_META.hpfCutoff.max}
+								canvasWidth={280}
+								canvasHeight={180}
+								renderHeight={FILTER_CURVE_HEIGHT}
+								onChange={(curve) => setCurve('hpfCutoff', curve)}
+							/>
+						</div>
+					</div>
+				</div>
 			</ResponsiveSection>
 
 			<ResponsiveSection title="MODULATION">
-				{#each MODULATION_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
+				<div class="param-grid">
+					{#each MODULATION_SLIDERS as slider (slider.key)}
+						<ParamSlider
+							paramKey={slider.key}
+							label={slider.label}
+							value={params[slider.key]}
+							onChange={(value) => onSliderValueChange(slider.key, value)}
+							onDragStart={onSliderDragStart}
+							onDragEnd={onSliderDragEnd}
+						/>
+					{/each}
+				</div>
 			</ResponsiveSection>
 
 			<ResponsiveSection title="FLANGER">
-				{#each FLANGER_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
+				<div class="param-grid">
+					{#each FLANGER_SLIDERS as slider (slider.key)}
+						<ParamSlider
+							paramKey={slider.key}
+							label={slider.label}
+							value={params[slider.key]}
+							onChange={(value) => onSliderValueChange(slider.key, value)}
+							onDragStart={onSliderDragStart}
+							onDragEnd={onSliderDragEnd}
+						/>
+					{/each}
+				</div>
 			</ResponsiveSection>
 
 			<ResponsiveSection title="BIT CRUSHER">
-				{#each BIT_CRUSHER_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
-			</ResponsiveSection>
-
-			<ResponsiveSection title="AUTOMATION">
-				{#each CURVEABLE_PARAMS as { key, label } (key)}
-					<div class="curve-row">
-						<button
-							type="button"
-							class="curve-toggle"
-							class:active={!!params.curves?.[key]}
-							onclick={() => toggleCurve(key)}
-						>
-							{label}
-						</button>
-						{#if params.curves?.[key]}
-							<BezierEditor
-								curve={params.curves[key]!}
-								paramMin={PARAM_META[key].min}
-								paramMax={PARAM_META[key].max}
-								onChange={(curve) => setCurve(key, curve)}
-							/>
-						{/if}
-					</div>
-				{/each}
+				<div class="param-grid">
+					{#each BIT_CRUSHER_SLIDERS as slider (slider.key)}
+						<ParamSlider
+							paramKey={slider.key}
+							label={slider.label}
+							value={params[slider.key]}
+							onChange={(value) => onSliderValueChange(slider.key, value)}
+							onDragStart={onSliderDragStart}
+							onDragEnd={onSliderDragEnd}
+						/>
+					{/each}
+				</div>
 			</ResponsiveSection>
 		</div>
 
 		<div class="right-column">
 			<ResponsiveSection title="EXPORT" open={true}>
-				{#each PLAYBACK_SLIDERS as slider (slider.key)}
-					<ParamSlider
-						paramKey={slider.key}
-						label={slider.label}
-						value={params[slider.key]}
-						onChange={(value) => onSliderValueChange(slider.key, value)}
-						onDragStart={onSliderDragStart}
-						onDragEnd={onSliderDragEnd}
-					/>
-				{/each}
+				<div class="param-grid">
+					{#each PLAYBACK_SLIDERS as slider (slider.key)}
+						<ParamSlider
+							paramKey={slider.key}
+							label={slider.label}
+							value={params[slider.key]}
+							onChange={(value) => onSliderValueChange(slider.key, value)}
+							onDragStart={onSliderDragStart}
+							onDragEnd={onSliderDragEnd}
+						/>
+					{/each}
+				</div>
 				<button class="play-button" type="button" onclick={() => void togglePlay()}>
 					{isPlaying ? '■ STOP' : '▶ PLAY'}
 				</button>
@@ -478,9 +510,25 @@
 		color: var(--yellow);
 	}
 
+	.param-grid {
+		display: grid;
+		gap: 0.6rem;
+	}
+
+	.param-grid__note {
+		grid-column: 1 / -1;
+	}
+
 	.osc-preview {
 		display: grid;
 		gap: 0.5rem;
+	}
+
+	.control-label {
+		margin: 0;
+		font-size: 0.65rem;
+		color: inherit;
+		letter-spacing: 0.05em;
 	}
 
 	.osc-preview__content {
@@ -509,43 +557,40 @@
 		align-content: start;
 	}
 
-	.osc-preview__label {
-		margin: 0;
-		font-size: 0.65rem;
-		color: var(--accent);
-		letter-spacing: 0.05em;
-	}
-
 	.audio-hint {
 		margin: -0.3rem 0 0;
 		font-size: 0.52rem;
 		color: var(--yellow);
 	}
 
-	.curve-row {
+	.filters-grid {
+		display: grid;
+		gap: 0.6rem;
+	}
+
+	.filter-column {
+		display: grid;
+		gap: 0.6rem;
+		align-content: start;
+	}
+
+	.filter-curve {
 		display: grid;
 		gap: 0.4rem;
 	}
 
-	.curve-toggle {
-		border: 2px solid var(--accent);
-		background: transparent;
-		color: var(--accent);
-		font: inherit;
-		font-size: 0.6rem;
-		padding: 0.5rem 0.8rem;
-		text-align: left;
-		width: 100%;
-		box-shadow: 2px 2px 0 #000;
-	}
-
-	.curve-toggle.active {
-		background: var(--accent);
-		color: #000;
-	}
-
 	@media (max-width: 900px) {
 		.layout {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (min-width: 700px) {
+		.param-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.param-grid--stacked {
 			grid-template-columns: 1fr;
 		}
 	}
@@ -559,6 +604,10 @@
 		.osc-preview__content {
 			grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr);
 			align-items: stretch;
+		}
+
+		.filters-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}
 </style>
